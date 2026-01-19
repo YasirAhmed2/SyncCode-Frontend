@@ -1,0 +1,170 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* SyncCode Design System - Modern Developer Aesthetic */
+
+
+@layer base {
+  :root {
+    /* Core backgrounds - Deep slate tones */
+    --background: 222 47% 6%;
+    --foreground: 210 40% 96%;
+
+    /* Cards & surfaces */
+    --card: 222 47% 8%;
+    --card-foreground: 210 40% 96%;
+
+    --popover: 222 47% 10%;
+    --popover-foreground: 210 40% 96%;
+
+    /* Primary - Purple/Blue from landing page (matching 9333ea/2563eb) */
+    --primary: 262 83% 58%;
+    /* purple-600 */
+    --primary-foreground: 210 40% 96%;
+
+    /* Secondary - Muted slate */
+    --secondary: 215 28% 17%;
+    --secondary-foreground: 210 40% 96%;
+
+    /* Muted elements */
+    --muted: 215 28% 14%;
+    --muted-foreground: 215 20% 55%;
+
+    /* Accent - Pink/Blue mix */
+    --accent: 330 81% 60%;
+    /* pink-500/600 */
+    --accent-foreground: 210 40% 96%;
+
+    /* Destructive - Warm red */
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 210 40% 98%;
+
+    /* Success - Green */
+    --success: 142 76% 45%;
+    --success-foreground: 222 47% 6%;
+
+    /* Warning - Amber */
+    --warning: 38 92% 50%;
+    --warning-foreground: 222 47% 6%;
+
+    /* Borders & inputs */
+    --border: 215 28% 20%;
+    --input: 215 28% 18%;
+    --ring: 262 83% 58%;
+
+    --radius: 0.75rem;
+
+    /* Sidebar */
+    --sidebar-background: 222 47% 7%;
+    --sidebar-foreground: 210 40% 90%;
+    --sidebar-primary: 187 85% 53%;
+    --sidebar-primary-foreground: 222 47% 6%;
+    --sidebar-accent: 215 28% 15%;
+    --sidebar-accent-foreground: 210 40% 90%;
+    --sidebar-border: 215 28% 18%;
+    --sidebar-ring: 187 85% 53%;
+
+    /* Custom gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(187 85% 53%), hsl(172 66% 50%));
+    --gradient-secondary: linear-gradient(135deg, hsl(222 47% 10%), hsl(222 47% 15%));
+    --gradient-landing: linear-gradient(to right, #2563eb, #9333ea, #db2777);
+    /* blue-600 via purple-600 to pink-600 */
+    --gradient-glow: radial-gradient(ellipse at center, hsl(187 85% 53% / 0.15), transparent 70%);
+
+    /* Shadows */
+    --shadow-glow: 0 0 40px hsl(187 85% 53% / 0.2);
+    --shadow-card: 0 4px 24px hsl(222 47% 4% / 0.5);
+  }
+
+  .dark {
+    /* Same as root - dark by default */
+  }
+}
+
+
+
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply antialiased;
+  background-image: linear-gradient(to bottom right, #0b061f, #120b3a, #020617);
+  background-attachment: fixed;
+  color: #ffffff;
+  /* Explicitly white per user request */
+  font-family: 'Inter', system-ui, sans-serif;
+  min-height: 100vh;
+}
+
+code,
+pre,
+.font-mono {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+
+@layer utilities {
+  .text-gradient {
+    @apply bg-clip-text text-transparent;
+    background-image: var(--gradient-primary);
+  }
+
+  .bg-gradient-primary {
+    background-image: var(--gradient-primary);
+  }
+
+  .bg-gradient-secondary {
+    background-image: var(--gradient-secondary);
+  }
+
+  .shadow-glow {
+    box-shadow: var(--shadow-glow);
+  }
+
+  .shadow-card {
+    box-shadow: var(--shadow-card);
+  }
+
+  .glass {
+    @apply backdrop-blur-xl;
+    background: hsl(222 47% 8% / 0.8);
+    border: 1px solid hsl(215 28% 20% / 0.5);
+  }
+
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+
+  .animate-pulse-glow {
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+
+  @keyframes float {
+
+    0%,
+    100% {
+      transform: translateY(0px);
+    }
+
+    50% {
+      transform: translateY(-20px);
+    }
+  }
+
+  @keyframes pulse-glow {
+
+    0%,
+    100% {
+      box-shadow: 0 0 20px hsl(187 85% 53% / 0.3);
+    }
+
+    50% {
+      box-shadow: 0 0 40px hsl(187 85% 53% / 0.5);
+    }
+  }
+}
