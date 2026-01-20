@@ -8,6 +8,7 @@ import { useAuth } from '../context/auth.context';
 import { Loader2, User, Mail, Lock } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
 import { authService } from '../lib/authService';
+import axios from 'axios';
 
 export default function Register() {
   const [name, setName] = useState('');
@@ -23,6 +24,11 @@ export default function Register() {
     setIsLoading(true);
 
     try {
+      await axios.post("https://api.synccode.dev/auth/register", {
+      name,
+      email,
+      password
+    }, { withCredentials: true });
       await authService.register({ name, email, password });
       toast({
         title: 'Verification email sent!',
