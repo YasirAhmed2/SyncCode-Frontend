@@ -211,7 +211,7 @@ export default function Room() {
 
     try {
       const res = await axios.post(
-        'https://api.synccode.dev/execute',
+        'https://synccode-backend-production.up.railway.app/execute',
         {
           code,
           language

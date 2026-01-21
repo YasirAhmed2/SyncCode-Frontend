@@ -1,4 +1,5 @@
-import api from "./api";
+import axios from "axios";
+// import api from "./api";
 
 /* =======================
    ROOM SERVICE
@@ -7,19 +8,21 @@ import api from "./api";
 export const roomService = {
   // Create coding room
   createRoom: async (language: "javascript" | "python") => {
-    const res = await api.post("/rooms/create", { language });
+    const res = await axios.post("https://synccode-backend-production.up.railway.app/rooms/create", 
+      { language },
+      { withCredentials: true });
     return res.data;
   },
 
   // Join room
   joinRoom: async (roomId: string) => {
-    const res = await api.post(`/rooms/join/${roomId}`);
+    const res = await axios.post(`https://synccode-backend-production.up.railway.app/rooms/join/${roomId}`, {}, { withCredentials: true });
     return res.data;
   },
 
   // Fetch room participants
   getParticipants: async (roomId: string) => {
-    const res = await api.get(`/rooms/${roomId}/participants`);
+    const res = await axios.get(`https://synccode-backend-production.up.railway.app/rooms/${roomId}/participants`, { withCredentials: true });
     return res.data;
   },
 
@@ -29,22 +32,22 @@ export const roomService = {
     code: string;
     language: string;
   }) => {
-    const res = await api.put(`/rooms/${data.roomId}/code/save`, {
+    const res = await axios.put(`https://synccode-backend-production.up.railway.app/rooms/${data.roomId}/code/save`, {
       code: data.code,
       language: data.language,
-    });
+    }, { withCredentials: true });
     return res.data;
   },
 
   // Load code
   loadCode: async (roomId: string) => {
-    const res = await api.get(`/rooms/${roomId}/code`);
+    const res = await axios.get(`https://synccode-backend-production.up.railway.app/rooms/${roomId}/code`, { withCredentials: true });
     return res.data;
   },
 
   // Get my rooms
   getMyRooms: async () => {
-    const res = await api.get('/rooms/my-rooms');
+    const res = await axios.get('https://synccode-backend-production.up.railway.app/rooms/my-rooms', { withCredentials: true });
     return res.data;
   },
 };
