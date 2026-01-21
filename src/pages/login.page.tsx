@@ -21,7 +21,7 @@ const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
   setIsLoading(true);
   try {
-    const res = await axios.post("https://api.synccode.dev/auth/login", {
+    const res = await axios.post("https://synccode-backend-production.up.railway.app/auth/login", {
       email,
       password
     }, { withCredentials: true });

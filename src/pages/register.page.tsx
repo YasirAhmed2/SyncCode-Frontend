@@ -24,7 +24,7 @@ export default function Register() {
     setIsLoading(true);
 
     try {
-      await axios.post("https://api.synccode.dev/auth/register", {
+      await axios.post("https://synccode-backend-production.up.railway.app/auth/register", {
       name,
       email,
       password
