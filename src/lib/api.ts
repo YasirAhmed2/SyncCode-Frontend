@@ -130,7 +130,7 @@
 
 import axios from "axios";
 
-const API_BASE_URL = "synccode-backend-production.up.railway.app";
+const API_BASE_URL = "synccode-backend.railway.internal";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
