@@ -30,7 +30,12 @@ export default function Login() {
         throw new Error(res.data?.error || "Login failed");
       }
 
-      login(res.data);
+      const { user, token, accessToken } = res.data;
+
+      // Support both 'token' and 'accessToken' properties
+      const authToken = token || accessToken;
+
+      login(user, authToken);
       toast.success("Login successful");
       console.log("Login response data:", res.data);
       navigate("/dashboard");

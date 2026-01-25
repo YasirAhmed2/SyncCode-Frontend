@@ -12,7 +12,7 @@ interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (user: User) => Promise<void>;
+  login: (user: User, token?: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => void;
   verifyOtp: (email: string, otp: string) => Promise<void>;
@@ -37,26 +37,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Check for existing session
     const storedUser = localStorage.getItem('synccode_user');
-    if (storedUser) {
+    const storedToken = localStorage.getItem('token');
+
+    if (storedUser && storedToken) {
       setUser(JSON.parse(storedUser));
     }
     setIsLoading(false);
   }, []);
 
-  const login = async (user: User) => {
-    // Simulate API call
+  const login = async (user: User, token?: string) => {
     setUser(user);
     localStorage.setItem('synccode_user', JSON.stringify(user));
+    if (token) { // It might be in user object if backend sends it weirdly, but usually separate
+      localStorage.setItem('token', token);
+    }
   };
 
-  const register = async (name: string, email: string, password: string) => {
+  const register = async (name: string, email: string, _password: string) => {
     // Simulate API call - would send OTP in real app
     await new Promise(resolve => setTimeout(resolve, 1000));
     localStorage.setItem('pending_verification_email', email);
     localStorage.setItem('pending_user_name', name);
   };
 
-  const verifyOtp = async (email: string, otp: string) => {
+  const verifyOtp = async (email: string, _otp: string) => {
     // Simulate OTP verification
     await new Promise(resolve => setTimeout(resolve, 1000));
 
@@ -79,7 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('reset_email', email);
   };
 
-  const resetPassword = async (email: string, otp: string, newPassword: string) => {
+  const resetPassword = async (_email: string, _otp: string, _newPassword: string) => {
     await new Promise(resolve => setTimeout(resolve, 1000));
     localStorage.removeItem('reset_email');
   };
@@ -87,6 +91,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     setUser(null);
     localStorage.removeItem('synccode_user');
+    localStorage.removeItem('token');
+    // Optional: Call API to logout server-side if needed, but client-side cleanup is critical
   };
 
   return (

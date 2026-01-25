@@ -137,6 +137,7 @@ export default function Room() {
 
   useEffect(() => {
     if (roomId && user) {
+      socket.auth = { token: localStorage.getItem('token') };
       socket.connect();
       socket.emit('join-room', { roomId, userId: user.id, userName: user.name });
 
