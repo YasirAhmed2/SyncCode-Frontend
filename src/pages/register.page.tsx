@@ -24,11 +24,11 @@ export default function Register() {
     setIsLoading(true);
 
     try {
-      await axios.post("https://synccode-backend.railway.internal/auth/register", {
-      name,
-      email,
-      password
-    }, { withCredentials: true });
+      await axios.post("https://synccode-backend-production.up.railway.app/auth/register", {
+        name,
+        email,
+        password
+      }, { withCredentials: true });
       await authService.register({ name, email, password });
       toast({
         title: 'Verification email sent!',

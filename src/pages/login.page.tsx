@@ -17,34 +17,34 @@ export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
 
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setIsLoading(true);
-  try {
-    const res = await axios.post("https://synccode-backend.railway.internal/auth/login", {
-      email,
-      password
-    }, { withCredentials: true });
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    try {
+      const res = await axios.post("https://synccode-backend-production.up.railway.app/auth/login", {
+        email,
+        password
+      }, { withCredentials: true });
 
-    if (!res.data?.user) {
-      throw new Error(res.data?.error || "Login failed");
+      if (!res.data?.user) {
+        throw new Error(res.data?.error || "Login failed");
+      }
+
+      login(res.data);
+      toast.success("Login successful");
+      console.log("Login response data:", res.data);
+      navigate("/dashboard");
+
+
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.message || err.response?.data?.error || "Invalid credentials";
+      toast.error(errorMessage);
+      console.error("Login error:", err);
+    } finally {
+      setIsLoading(false);
     }
+  };
 
-    login(res.data);
-    toast.success("Login successful");
-    console.log("Login response data:", res.data);
-    navigate("/dashboard");
- 
-
-  } catch (err: any) {
-    const errorMessage = err.response?.data?.message || err.response?.data?.error || "Invalid credentials";
-    toast.error(errorMessage);
-    console.error("Login error:", err);
-  } finally {
-    setIsLoading(false);
-  }
-};
-  
   return (
     <AuthLayout
       title="Welcome back"

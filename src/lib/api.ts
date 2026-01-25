@@ -105,7 +105,7 @@
 //     const defaultCode = savedLang === 'javascript' 
 //       ? "// Start coding in JavaScript...\nconsole.log('Hello SyncCode');"
 //       : "# Start coding in Python...\nprint('Hello SyncCode')";
-    
+
 //     return { code: defaultCode, language: savedLang as 'javascript' | 'python' };
 //   }
 // };
@@ -129,8 +129,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import axios from "axios";
-
-const API_BASE_URL = "synccode-backend.railway.internal";
+// https://synccode-backend-production.up.railway.app/
+const API_BASE_URL = "synccode-backend-production.up.railway.app";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
