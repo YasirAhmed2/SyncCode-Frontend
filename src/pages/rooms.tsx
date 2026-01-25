@@ -32,7 +32,7 @@ import {
   SelectValue,
 } from '../components/ui/select';
 import { roomService } from '../lib/roomService';
-import axios from 'axios';
+import api from '../lib/api';
 
 export default function Room() {
   // const socket=io('http://localhost:5000', {
@@ -210,14 +210,11 @@ export default function Room() {
     setOutput('Running...\n');
 
     try {
-      const res = await axios.post(
-        'https://synccode-backend-production.up.railway.app/execute',
+      const res = await api.post(
+        '/execute',
         {
           code,
           language
-        },
-        {
-          withCredentials: true, // VERY IMPORTANT (JWT cookie)
         }
       );
 

@@ -1,5 +1,5 @@
-// import api from "./api";
-import axios from "axios";
+import api from "./api";
+
 /* =======================
    CODE EXECUTION SERVICE
 ======================= */
@@ -10,7 +10,9 @@ export const executionService = {
     language: "javascript" | "python";
     input?: string;
   }) => {
-    const res = await axios.post("https://synccode-backend-production.up.railway.app/execute", data, { withCredentials: true });
+    // POST /execute
+    const res = await api.post("/execute", data);
     return res.data;
   },
 };
+
