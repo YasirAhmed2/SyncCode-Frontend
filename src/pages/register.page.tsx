@@ -8,7 +8,7 @@ import { useAuth } from '../context/auth.context';
 import { Loader2, User, Mail, Lock } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
 import { authService } from '../lib/authService';
-import axios from 'axios';
+
 
 export default function Register() {
   const [name, setName] = useState('');
@@ -24,12 +24,9 @@ export default function Register() {
     setIsLoading(true);
 
     try {
-      await axios.post("https://synccode-backend-production.up.railway.app/auth/register", {
-        name,
-        email,
-        password
-      }, { withCredentials: true });
+      // Use the centralized authService
       await authService.register({ name, email, password });
+
       toast({
         title: 'Verification email sent!',
         description: 'Please check your inbox and enter the OTP.',
