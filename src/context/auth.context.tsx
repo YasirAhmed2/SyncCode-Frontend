@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import { authService } from '../services/authService';
 
 interface User {
   id: string;
@@ -53,29 +54,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const register = async (name: string, email: string, _password: string) => {
-    // Simulate API call - would send OTP in real app
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    localStorage.setItem('pending_verification_email', email);
-    localStorage.setItem('pending_user_name', name);
+  const register = async (name: string, email: string, password: string) => {
+    try {
+      await authService.register({ name, email, password });
+      localStorage.setItem('pending_verification_email', email);
+      localStorage.setItem('pending_user_name', name);
+    } catch (error) {
+      console.error("Registration failed:", error);
+      throw error;
+    }
   };
 
-  const verifyOtp = async (email: string, _otp: string) => {
-    // Simulate OTP verification
-    await new Promise(resolve => setTimeout(resolve, 1000));
+  const verifyOtp = async (email: string, otp: string) => {
+    try {
+      const response = await authService.verifyEmailOtp(email, otp);
 
-    const name = localStorage.getItem('pending_user_name') || email.split('@')[0];
-    const mockUser: User = {
-      id: 'user_' + Math.random().toString(36).substr(2, 9),
-      name,
-      email,
-      avatarColor: getRandomColor(),
-    };
+      // Backend returns: { message, user: { userId, name, email }, token }
+      const { user: backendUser, token } = response.data;
 
-    setUser(mockUser);
-    localStorage.setItem('synccode_user', JSON.stringify(mockUser));
-    localStorage.removeItem('pending_verification_email');
-    localStorage.removeItem('pending_user_name');
+      const mappedUser: User = {
+        id: backendUser.userId,
+        name: backendUser.name,
+        email: backendUser.email,
+        avatarColor: getRandomColor(), // Backend doesn't persist this yet
+      };
+
+      await login(mappedUser, token);
+
+      localStorage.removeItem('pending_verification_email');
+      localStorage.removeItem('pending_user_name');
+    } catch (error) {
+      console.error("Verification failed:", error);
+      throw error;
+    }
   };
 
   const requestPasswordReset = async (email: string) => {
