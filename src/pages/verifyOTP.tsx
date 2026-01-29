@@ -15,19 +15,19 @@ export default function VerifyOtp() {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
-  
+
   const email = location.state?.email || '';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (otp.length !== 6) return;
-    
+
     setIsLoading(true);
-try{
-await axios.post("https://api.synccode.dev/auth/verify-email", {
-  email,
-  otp,
-}, { withCredentials: true });
+    try {
+      await axios.post("https://synccode-backend-production.up.railway.app/auth/verify-email", {
+        email,
+        otp,
+      }, { withCredentials: true });
       toast({
         title: 'Account verified!',
         description: 'Your account has been successfully verified.',
@@ -67,11 +67,11 @@ await axios.post("https://api.synccode.dev/auth/verify-email", {
           </InputOTP>
         </div>
 
-        <Button 
-          type="submit" 
-          variant="hero" 
-          className="w-full" 
-          size="lg" 
+        <Button
+          type="submit"
+          variant="hero"
+          className="w-full"
+          size="lg"
           disabled={isLoading || otp.length !== 6}
         >
           {isLoading ? (
