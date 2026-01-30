@@ -96,7 +96,7 @@ export default function Dashboard() {
       });
       setIsJoinDialogOpen(false);
       setJoinRoomId('');
-      navigate(`/room/${joinRoomId}`);
+      navigate(`/rooms/${joinRoomId}`);
     } catch (error) {
       toast({
         title: 'Failed to join room',
