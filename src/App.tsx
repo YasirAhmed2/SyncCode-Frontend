@@ -92,7 +92,7 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/room/:roomId"
+        path="/rooms/:roomId"
         element={
           <ProtectedRoute>
             <Room />
