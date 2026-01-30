@@ -36,14 +36,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check for existing session
-    const storedUser = localStorage.getItem('synccode_user');
-    const storedToken = localStorage.getItem('token');
+    const checkAuth = async () => {
+      try {
+        const storedUser = localStorage.getItem('synccode_user');
+        const storedToken = localStorage.getItem('token');
 
-    if (storedUser && storedToken) {
-      setUser(JSON.parse(storedUser));
-    }
-    setIsLoading(false);
+        // Optimistically set user from local storage if available
+        if (storedUser && storedToken) {
+           setUser(JSON.parse(storedUser));
+        }
+
+        // Verify with backend (Critical for HttpOnly cookies or if local storage is stale)
+        const response = await authService.me();
+        
+        // Backend returns user details
+        const { _id, name, email, avatarColor } = response.data;
+        
+        const validatedUser: User = {
+            id: _id,
+            name,
+            email,
+            avatarColor
+        };
+        
+        setUser(validatedUser);
+        localStorage.setItem('synccode_user', JSON.stringify(validatedUser));
+        
+      } catch (error) {
+        // If backend check fails, clear everything
+        console.error("Session verification failed:", error);
+        localStorage.removeItem('synccode_user');
+        localStorage.removeItem('token');
+        setUser(null);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkAuth();
   }, []);
 
   const login = async (user: User, token?: string) => {
