@@ -71,7 +71,7 @@ export default function Dashboard() {
       // setNewRoomName('');
 
       console.log("Created room data (context):", newRoom);
-      navigate(`/room/${newRoom.id}`);
+      navigate(`/rooms/${newRoom.id}`);
     } catch (error) {
       console.error(error);
       toast({
