@@ -37,37 +37,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const checkAuth = async () => {
-      try {
-        const storedUser = localStorage.getItem('synccode_user');
-        const storedToken = localStorage.getItem('token');
+      // 1. Load local data first (Optimistic UI)
+      const storedUser = localStorage.getItem('synccode_user');
+      const storedToken = localStorage.getItem('token');
 
-        // Optimistically set user from local storage if available
-        if (storedUser && storedToken) {
-           setUser(JSON.parse(storedUser));
+      if (storedUser && storedToken) {
+        try {
+          setUser(JSON.parse(storedUser));
+        } catch (e) {
+          console.error("Failed to parse stored user", e);
+        }
+      }
+
+      try {
+        // 2. Verify with backend
+        const response = await authService.me();
+
+        // Handle various response structures: response.data (direct user) or response.data.user
+        const data = response.data;
+        const userData = data.user || data;
+
+        // Normalize ID: support _id, id, or userId
+        const userId = userData._id || userData.id || userData.userId;
+
+        if (userId) {
+          const validatedUser: User = {
+            id: userId,
+            name: userData.name,
+            email: userData.email,
+            avatarColor: userData.avatarColor
+          };
+
+          setUser(validatedUser);
+          localStorage.setItem('synccode_user', JSON.stringify(validatedUser));
         }
 
-        // Verify with backend (Critical for HttpOnly cookies or if local storage is stale)
-        const response = await authService.me();
-        
-        // Backend returns user details
-        const { _id, name, email, avatarColor } = response.data;
-        
-        const validatedUser: User = {
-            id: _id,
-            name,
-            email,
-            avatarColor
-        };
-        
-        setUser(validatedUser);
-        localStorage.setItem('synccode_user', JSON.stringify(validatedUser));
-        
-      } catch (error) {
-        // If backend check fails, clear everything
-        console.error("Session verification failed:", error);
-        localStorage.removeItem('synccode_user');
-        localStorage.removeItem('token');
-        setUser(null);
+      } catch (error: any) {
+        console.error("Session verification warning:", error);
+
+        // Only force logout if explicitly unauthorized (401) or forbidden (403)
+        // If it's a 404 (endpoint not found) or 500 (server error), we keep the local session,
+        // prioritizing user access over strict validation in case of network glitches.
+        if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+          localStorage.removeItem('synccode_user');
+          localStorage.removeItem('token');
+          setUser(null);
+        }
       } finally {
         setIsLoading(false);
       }
