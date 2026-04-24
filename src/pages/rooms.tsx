@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { roomService } from '../lib/roomService';
 import { executionService } from '../lib/executionService';
 
-interface Message { id: string; userId: string; userName: string; content: string; timestamp: Date; }
+interface Message { id: string; userId: string; userName: string; content: string; timestamp: string; }
 type TerminalLevel = 'info' | 'stdout' | 'stderr' | 'error' | 'system';
 interface TerminalEntry { id: string; level: TerminalLevel; message: string; timestamp: string; }
 interface NormalizedExecutionResult { stdout: string; stderr: string; exitCode: number | null; }
@@ -20,7 +20,7 @@ export default function Room() {
   const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { currentRoom, code, language, messages, updateCode, setLanguage, sendMessage, joinRoom, leaveRoom } = useRoom();
+  const { currentRoom, code, language, messages, updateCode, setLanguage, addMessage, setRoomMessages, joinRoom, leaveRoom } = useRoom();
   const { toast } = useToast();
 
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -46,7 +46,14 @@ export default function Room() {
   const isRemoteUpdate = useRef(false);
   const cursorDecorations = useRef<Map<string, string[]>>(new Map());
   const isJoiningRoom = useRef(false); // guard against re-entrant joinRoom calls
-  const [localMessages, setLocalMessages] = useState<Message[]>([]);
+
+  const normalizeMessage = (raw: any): Message => ({
+    id: raw?.id || `msg_${Date.now()}`,
+    userId: raw?.userId || 'unknown',
+    userName: raw?.userName || 'Unknown',
+    content: raw?.content || '',
+    timestamp: raw?.timestamp ? new Date(raw.timestamp).toISOString() : new Date().toISOString(),
+  });
 
   const handleRemoteCursorUpdate = (remoteCursor: any) => {
     if (!editorRef.current || !monacoRef.current) return;
@@ -91,9 +98,15 @@ export default function Room() {
       socket.on('user-joined', (joinData: any) => { joinRoom(roomId); toast({ title: `${joinData.userName} joined the room`, duration: 2000 }); });
       socket.on('user-left', () => undefined);
       socket.on('language-update', (updateData: any) => { const newLang = typeof updateData === 'string' ? updateData : updateData.language; setLanguage(newLang); if (updateData.changedBy) toast({ title: `${updateData.changedBy.userName} changed language to ${newLang}`, duration: 2000 }); });
-      socket.on('chat-message', (messageData: any) => { setLocalMessages(prev => [...prev, { id: messageData.id || 'msg_' + Date.now(), userId: messageData.userId, userName: messageData.userName, content: messageData.content, timestamp: messageData.timestamp || new Date() }]); });
+      socket.on('room-chat-history', ({ messages: roomMessages }: any) => {
+        const normalized = Array.isArray(roomMessages) ? roomMessages.map(normalizeMessage) : [];
+        setRoomMessages(normalized);
+      });
+      socket.on('chat-message', (messageData: any) => {
+        addMessage(normalizeMessage(messageData));
+      });
       return () => {
-        socket.off('code-update'); socket.off('cursor-update'); socket.off('language-update'); socket.off('participants-updated'); socket.off('user-joined'); socket.off('user-left'); socket.off('chat-message');
+        socket.off('code-update'); socket.off('cursor-update'); socket.off('language-update'); socket.off('participants-updated'); socket.off('user-joined'); socket.off('user-left'); socket.off('room-chat-history'); socket.off('chat-message');
         socket.emit('leave-room', { roomId, userId: user.id }); socket.disconnect(); setIsConnected(false);
       };
     }
@@ -105,7 +118,7 @@ export default function Room() {
       joinRoom(roomId).finally(() => { isJoiningRoom.current = false; });
     }
   }, [roomId]); // intentionally narrow deps — prevents re-mount during execution
-  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [localMessages, messages]);
+  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
   useEffect(() => { outputEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [terminalEntries, isExecuting]);
 
   const handleCopyRoomId = () => { navigator.clipboard.writeText(roomId || ''); setCopied(true); toast({ title: 'Room ID copied!' }); setTimeout(() => setCopied(false), 2000); };
@@ -223,11 +236,26 @@ export default function Room() {
     }
   };
   const handleSaveCode = async () => { try { if (!roomId) return; await roomService.saveCode({ roomId, code, language }); toast({ title: 'Code saved successfully' }); } catch { toast({ title: 'Failed to save code', variant: 'destructive' }); } };
-  const handleSendMessage = () => { if (!newMessage.trim()) return; socket.emit('chat-message', { roomId, message: { id: 'msg_' + Date.now(), content: newMessage }, userId: user?.id, userName: user?.name, avatarColor: user?.avatarColor || '#4F46E5' }); sendMessage(newMessage); setNewMessage(''); };
+  const handleSendMessage = () => {
+    const content = newMessage.trim();
+    if (!content || !roomId || !user?.id || !user?.name) return;
+
+    const messageId = `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    socket.emit('chat-message', {
+      roomId,
+      message: { id: messageId, content },
+      userId: user.id,
+      userName: user.name,
+      avatarColor: user.avatarColor || '#4F46E5',
+    });
+    setNewMessage('');
+  };
   const handleLeave = () => { leaveRoom(); navigate('/dashboard'); };
 
   const participants = activeParticipants && activeParticipants.length > 0 ? activeParticipants : [{ id: user?.id || '1', name: user?.name || 'You', avatarColor: user?.avatarColor || '#4F46E5', isOnline: true }];
-  const allMessages = [...messages, ...localMessages].reduce((acc: Message[], msg) => { if (!acc.find(m => m.id === msg.id)) acc.push(msg); return acc; }, []).sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+  const allMessages = messages
+    .slice()
+    .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#0B0F19' }}>

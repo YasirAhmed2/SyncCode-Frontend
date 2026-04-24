@@ -13,8 +13,9 @@ interface Message {
   id: string;
   userId: string;
   userName: string;
+  avatarColor?: string;
   content: string;
-  timestamp: Date;
+  timestamp: string;
 }
 
 interface Room {
@@ -34,7 +35,9 @@ interface RoomContextType {
   createRoom: (language: "javascript" | "python") => Promise<Room>;
   joinRoom: (roomId: string) => Promise<void>;
   leaveRoom: () => void;
-  sendMessage: (content: string) => void;
+  sendMessage: (content: string, sender?: { userId: string; userName: string; avatarColor?: string }) => void;
+  addMessage: (message: Message) => void;
+  setRoomMessages: (messageList: Message[]) => void;
   updateCode: (newCode: string) => void;
   setLanguage: (lang: 'javascript' | 'python') => void;
   executeCode: () => Promise<{ output: string; error: string | null }>;
@@ -122,16 +125,30 @@ export function RoomProvider({ children }: { children: ReactNode }) {
     setCode('// Code cleared');
   };
 
-  const sendMessage = (content: string) => {
-    // Placeholder for socket - actual socket emission is done in rooms.tsx
+  const sendMessage = (content: string, sender?: { userId: string; userName: string; avatarColor?: string }) => {
     const newMessage: Message = {
       id: 'msg_' + Date.now(),
-      userId: 'current_user',
-      userName: 'You',
+      userId: sender?.userId || 'current_user',
+      userName: sender?.userName || 'You',
+      avatarColor: sender?.avatarColor,
       content,
-      timestamp: new Date(),
+      timestamp: new Date().toISOString(),
     };
-    setMessages(prev => [...prev, newMessage]);
+    setMessages(prev => {
+      if (prev.some((msg) => msg.id === newMessage.id)) return prev;
+      return [...prev, newMessage];
+    });
+  };
+
+  const addMessage = (message: Message) => {
+    setMessages((prev) => {
+      if (prev.some((msg) => msg.id === message.id)) return prev;
+      return [...prev, message];
+    });
+  };
+
+  const setRoomMessages = (messageList: Message[]) => {
+    setMessages(messageList);
   };
 
   const updateCode = (newCode: string) => {
@@ -164,6 +181,8 @@ export function RoomProvider({ children }: { children: ReactNode }) {
         joinRoom,
         leaveRoom,
         sendMessage,
+        addMessage,
+        setRoomMessages,
         updateCode,
         setLanguage,
         executeCode,
