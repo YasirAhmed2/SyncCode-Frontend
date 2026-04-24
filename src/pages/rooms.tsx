@@ -2,7 +2,6 @@ import { socket } from '../lib/socket.ts';
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Editor from '@monaco-editor/react';
-import { Input } from '../components/ui/input';
 import { useAuth } from '../context/auth.context';
 import { useRoom } from '../context/room.context';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -10,9 +9,12 @@ import { Play, Copy, Check, Users, MessageCircle, Code2, ChevronLeft, Send, Term
 import { useToast } from '../hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { roomService } from '../lib/roomService';
-import api from '../lib/api';
+import { executionService } from '../lib/executionService';
 
 interface Message { id: string; userId: string; userName: string; content: string; timestamp: Date; }
+type TerminalLevel = 'info' | 'stdout' | 'stderr' | 'error' | 'system';
+interface TerminalEntry { id: string; level: TerminalLevel; message: string; timestamp: string; }
+interface NormalizedExecutionResult { stdout: string; stderr: string; exitCode: number | null; }
 
 export default function Room() {
   const { roomId } = useParams<{ roomId: string }>();
@@ -32,11 +34,13 @@ export default function Room() {
   const [copied, setCopied] = useState(false);
   const [outputCopied, setOutputCopied] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
+  const [terminalEntries, setTerminalEntries] = useState<TerminalEntry[]>([]);
   const [activeParticipants, setActiveParticipants] = useState<Array<{ id: string; name: string; avatarColor: string; isOnline: boolean }>>(
     currentRoom?.participants || [{ id: user?.id || '1', name: user?.name || 'You', avatarColor: user?.avatarColor || '#4F46E5', isOnline: true }]
   );
 
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const outputEndRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<any>(null);
   const monacoRef = useRef<any>(null);
   const isRemoteUpdate = useRef(false);
@@ -85,7 +89,7 @@ export default function Room() {
       socket.on('cursor-update', (cursorData: any) => { if (cursorData.userId !== user.id) handleRemoteCursorUpdate(cursorData); });
       socket.on('participants-updated', ({ participants }: any) => setActiveParticipants(participants));
       socket.on('user-joined', (joinData: any) => { joinRoom(roomId); toast({ title: `${joinData.userName} joined the room`, duration: 2000 }); });
-      socket.on('user-left', ({ userId }: any) => console.log(`User ${userId} left the room`));
+      socket.on('user-left', () => undefined);
       socket.on('language-update', (updateData: any) => { const newLang = typeof updateData === 'string' ? updateData : updateData.language; setLanguage(newLang); if (updateData.changedBy) toast({ title: `${updateData.changedBy.userName} changed language to ${newLang}`, duration: 2000 }); });
       socket.on('chat-message', (messageData: any) => { setLocalMessages(prev => [...prev, { id: messageData.id || 'msg_' + Date.now(), userId: messageData.userId, userName: messageData.userName, content: messageData.content, timestamp: messageData.timestamp || new Date() }]); });
       return () => {
@@ -102,16 +106,69 @@ export default function Room() {
     }
   }, [roomId]); // intentionally narrow deps — prevents re-mount during execution
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [localMessages, messages]);
+  useEffect(() => { outputEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [terminalEntries, isExecuting]);
 
   const handleCopyRoomId = () => { navigator.clipboard.writeText(roomId || ''); setCopied(true); toast({ title: 'Room ID copied!' }); setTimeout(() => setCopied(false), 2000); };
+  const getTimeStamp = () => new Date().toLocaleTimeString([], { hour12: false });
+  const appendTerminalEntry = (level: TerminalLevel, message: string) => {
+    setTerminalEntries((prev) => [
+      ...prev,
+      {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        level,
+        message,
+        timestamp: getTimeStamp(),
+      },
+    ]);
+  };
+  const appendTerminalBlock = (level: TerminalLevel, block: string) => {
+    const lines = block
+      .split('\n')
+      .map((line) => line.trimEnd())
+      .filter((line) => line.length > 0);
+
+    if (!lines.length) return;
+    setTerminalEntries((prev) => [
+      ...prev,
+      ...lines.map((line) => ({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        level,
+        message: line,
+        timestamp: getTimeStamp(),
+      })),
+    ]);
+  };
+
+  const normalizeExecutionResult = (res: any): NormalizedExecutionResult => {
+    const directStdout = typeof res?.stdout === 'string' ? res.stdout : '';
+    const directStderr = typeof res?.stderr === 'string' ? res.stderr : '';
+    const nestedStdout = typeof res?.run?.stdout === 'string' ? res.run.stdout : '';
+    const nestedStderr = typeof res?.run?.stderr === 'string' ? res.run.stderr : '';
+    const outputField = typeof res?.output === 'string' ? res.output : '';
+    const errorField = typeof res?.error === 'string' ? res.error : '';
+
+    const normalizedStdout = (directStdout || nestedStdout || outputField || '').trimEnd();
+    const normalizedStderr = (directStderr || nestedStderr || errorField || '').trimEnd();
+
+    const maybeExitCode = res?.exitCode ?? res?.code ?? res?.run?.code ?? null;
+    const normalizedExitCode = typeof maybeExitCode === 'number'
+      ? maybeExitCode
+      : Number.isFinite(Number(maybeExitCode))
+        ? Number(maybeExitCode)
+        : null;
+
+    return {
+      stdout: normalizedStdout,
+      stderr: normalizedStderr,
+      exitCode: normalizedExitCode,
+    };
+  };
+
   const handleExecute = async () => {
     // Always read live code from the editor ref — context `code` can lag behind
     const liveCode = editorRef.current
       ? editorRef.current.getValue()
       : code;
-
-    console.log('[Execute] liveCode:', liveCode?.slice(0, 80));
-    console.log('[Execute] language:', language);
 
     if (!liveCode || !liveCode.trim()) {
       toast({ title: 'No code to execute', description: 'Write some code first.', variant: 'destructive' });
@@ -121,31 +178,47 @@ export default function Room() {
     setIsExecuting(true);
     setIsOutputOpen(true);
     setOutputResult(null);
-    console.log('[Execute] calling API...');
+    setTerminalEntries([]);
+    appendTerminalEntry('info', `Running ${language} code...`);
 
     try {
-      const res = await api.post('/execute', { code: liveCode, language });
-      console.log('[Execute] response:', res.data);
-      const { stdout, stderr, exitCode } = res.data;
+      const res = await executionService.execute({ code: liveCode, language });
+      const normalized = normalizeExecutionResult(res);
+      const cleanedStdout = normalized.stdout;
+      const cleanedStderr = normalized.stderr;
+      const resolvedExitCode = normalized.exitCode;
+
+      if (!cleanedStdout && !cleanedStderr && typeof res === 'object' && res !== null) {
+        appendTerminalBlock('system', JSON.stringify(res, null, 2));
+      }
+
+      if (cleanedStdout) appendTerminalBlock('stdout', cleanedStdout);
+      if (cleanedStderr) appendTerminalBlock('stderr', cleanedStderr);
+      if (!cleanedStdout && !cleanedStderr) appendTerminalEntry('system', 'Program exited with no output.');
+      appendTerminalEntry(
+        resolvedExitCode === 0 || resolvedExitCode === null ? 'system' : 'error',
+        resolvedExitCode === null ? 'Execution completed.' : `Process exited with code ${resolvedExitCode}.`
+      );
+
       setOutputResult({
-        stdout: (stdout || '').trimEnd(),
-        stderr: (stderr || '').trimEnd(),
-        exitCode: exitCode ?? null,
+        stdout: cleanedStdout,
+        stderr: cleanedStderr,
+        exitCode: resolvedExitCode,
         error: null,
-        timestamp: new Date().toLocaleTimeString(),
+        timestamp: getTimeStamp(),
         language,
       });
     } catch (error: any) {
       const msg = error?.response?.data?.error || error?.message || 'Execution failed';
-      console.error('[Execute] error:', msg);
+      appendTerminalEntry('error', msg);
+      appendTerminalEntry('error', 'Process exited with code 1.');
       setOutputResult({
         stdout: '', stderr: '', exitCode: 1,
         error: msg,
-        timestamp: new Date().toLocaleTimeString(),
+        timestamp: getTimeStamp(),
         language,
       });
     } finally {
-      console.log('[Execute] done, isOutputOpen should be true');
       setIsExecuting(false);
     }
   };
@@ -275,7 +348,7 @@ export default function Room() {
                 animate={{ height: 'auto', opacity: 1 }}
                 exit={{ height: 0, opacity: 0 }}
                 transition={{ duration: 0.2, ease: 'easeOut' }}
-                style={{ flexShrink: 0, borderTop: '1px solid rgba(255,255,255,0.07)', display: 'flex', flexDirection: 'column', background: '#020617', minHeight: '56px', maxHeight: '300px' }}
+                style={{ flexShrink: 0, borderTop: '1px solid rgba(255,255,255,0.07)', display: 'flex', flexDirection: 'column', background: '#020617', minHeight: '140px', maxHeight: '320px' }}
               >
                 {/* Panel header */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 14px', borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0, background: '#0D1117' }}>
@@ -335,51 +408,38 @@ export default function Room() {
                       <Loader2 size={13} className="animate-spin" />
                       <span>Executing {language} code…</span>
                     </div>
-                  ) : outputResult ? (
-                    <>
-                      {/* STDOUT block */}
-                      {outputResult.stdout ? (
-                        <div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                            <span style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#34D399', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.18)', padding: '1px 7px', borderRadius: '4px' }}>stdout</span>
-                          </div>
-                          <pre style={{ margin: 0, fontSize: '12.5px', fontFamily: 'JetBrains Mono, monospace', color: '#D1FAE5', lineHeight: 1.7, whiteSpace: 'pre-wrap', wordBreak: 'break-word', background: 'rgba(16,185,129,0.04)', border: '1px solid rgba(16,185,129,0.1)', borderRadius: '8px', padding: '10px 14px' }}>
-                            {outputResult.stdout}
-                          </pre>
-                        </div>
-                      ) : null}
+                  ) : terminalEntries.length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      {terminalEntries.map((entry) => {
+                        const metaColor = entry.level === 'stderr' || entry.level === 'error'
+                          ? '#FCA5A5'
+                          : entry.level === 'stdout'
+                            ? '#6EE7B7'
+                            : '#93C5FD';
+                        const textColor = entry.level === 'stderr' || entry.level === 'error' ? '#FECACA' : '#E5E7EB';
+                        const label = entry.level.toUpperCase();
 
-                      {/* STDERR block */}
-                      {outputResult.stderr ? (
-                        <div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                            <span style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#F87171', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.18)', padding: '1px 7px', borderRadius: '4px' }}>stderr</span>
+                        return (
+                          <div
+                            key={entry.id}
+                            style={{
+                              display: 'grid',
+                              gridTemplateColumns: '88px 62px 1fr',
+                              gap: '10px',
+                              alignItems: 'start',
+                              fontFamily: 'JetBrains Mono, monospace',
+                              fontSize: '12px',
+                              lineHeight: 1.6,
+                            }}
+                          >
+                            <span style={{ color: '#64748B' }}>[{entry.timestamp}]</span>
+                            <span style={{ color: metaColor, fontWeight: 700 }}>{label}</span>
+                            <span style={{ color: textColor, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{entry.message}</span>
                           </div>
-                          <pre style={{ margin: 0, fontSize: '12.5px', fontFamily: 'JetBrains Mono, monospace', color: '#FCA5A5', lineHeight: 1.7, whiteSpace: 'pre-wrap', wordBreak: 'break-word', background: 'rgba(239,68,68,0.04)', border: '1px solid rgba(239,68,68,0.12)', borderRadius: '8px', padding: '10px 14px' }}>
-                            {outputResult.stderr}
-                          </pre>
-                        </div>
-                      ) : null}
-
-                      {/* API / network error block */}
-                      {outputResult.error ? (
-                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '12px 14px', borderRadius: '8px', background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.18)' }}>
-                          <span style={{ fontSize: '16px', lineHeight: 1 }}>⚠️</span>
-                          <div>
-                            <p style={{ fontSize: '11px', fontWeight: 700, color: '#F87171', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Execution Error</p>
-                            <pre style={{ margin: 0, fontSize: '12px', fontFamily: 'JetBrains Mono, monospace', color: '#FCA5A5', lineHeight: 1.65, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{outputResult.error}</pre>
-                          </div>
-                        </div>
-                      ) : null}
-
-                      {/* Empty output notice */}
-                      {!outputResult.stdout && !outputResult.stderr && !outputResult.error && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#4B5563', fontFamily: 'JetBrains Mono, monospace', fontSize: '12px' }}>
-                          <Check size={13} color="#34D399" />
-                          <span>Program exited with no output.</span>
-                        </div>
-                      )}
-                    </>
+                        );
+                      })}
+                      <div ref={outputEndRef} />
+                    </div>
                   ) : (
                     /* Initial idle state */
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#374151', fontFamily: 'JetBrains Mono, monospace', fontSize: '12px' }}>
