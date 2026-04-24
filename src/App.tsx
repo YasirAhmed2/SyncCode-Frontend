@@ -23,7 +23,10 @@ const queryClient = new QueryClient();
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
 
-  if (isLoading) {
+  // Only block on the very first load (no cached user yet).
+  // Do NOT remount children on background re-checks — that wipes room state mid-session.
+  const hasStoredUser = !!localStorage.getItem('synccode_user');
+  if (isLoading && !hasStoredUser) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
@@ -31,7 +34,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!isAuthenticated) {
+  if (!isAuthenticated && !hasStoredUser) {
     return <Navigate to="/login" replace />;
   }
 

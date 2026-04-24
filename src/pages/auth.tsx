@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import React, { useState } from 'react';
-import { authService } from '../lib/api';
+import { authService } from '../lib/authService';
 import { type User } from '../types';
 
 interface AuthProps {
@@ -40,7 +40,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onBack }) => {
         const res = await authService.register(formData);
         if (res.success) setStep('otp');
       } else if (step === 'otp') {
-        const res = await authService.verifyOtp(formData.email, formData.otp);
+        const res = await authService.verifyEmailOtp(formData.email, formData.otp);
         if (res.success) setStep('login');
       } else if (step === 'forgot-password') {
         // Handle forgot password logic

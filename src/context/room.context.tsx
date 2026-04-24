@@ -123,7 +123,7 @@ export function RoomProvider({ children }: { children: ReactNode }) {
   };
 
   const sendMessage = (content: string) => {
-    // Placeholder for socket
+    // Placeholder for socket - actual socket emission is done in rooms.tsx
     const newMessage: Message = {
       id: 'msg_' + Date.now(),
       userId: 'current_user',

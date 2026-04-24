@@ -32,7 +32,7 @@ export const authService = {
 
   // 4️⃣ Get logged-in user
   getMe: async () => {
-    const res = await api.get("/auth/me");
+    const res = await api.get("/user/me");
     return res.data;
   },
 
@@ -50,16 +50,24 @@ export const authService = {
 
   // 7️⃣ Verify reset OTP → receive reset token
   verifyResetOtp: async (email: string, otp: string) => {
-    const res = await api.post("/auth/verify-reset-otp", { email, otp });
+    const res = await api.post("/auth/verify-otp", { email, otp });
     return res.data; // contains resetToken
   },
 
   // 8️⃣ Reset password using token
   resetPassword: async (data: {
-    token: string;
+    token?: string;
     newPassword: string;
   }) => {
-    const res = await api.post("/auth/reset-password", data);
+    const res = await api.post(
+      "/auth/reset-password",
+      { newPassword: data.newPassword },
+      {
+        headers: data.token
+          ? { Authorization: `Bearer ${data.token}` }
+          : undefined,
+      }
+    );
     return res.data;
   },
 };

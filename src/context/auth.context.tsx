@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
-import { authService } from '../services/authService';
+import { authService } from '../lib/authService';
 
 interface User {
   id: string;
@@ -51,10 +51,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       try {
         // 2. Verify with backend
-        const response = await authService.me();
+        const response = await authService.getMe();
 
         // Handle various response structures: response.data (direct user) or response.data.user
-        const data = response.data;
+        const data = response;
         const userData = data.user || data;
 
         // Normalize ID: support _id, id, or userId
@@ -115,7 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const response = await authService.verifyEmailOtp(email, otp);
 
       // Backend returns: { message, user: { userId, name, email }, token }
-      const { user: backendUser, token } = response.data;
+      const { user: backendUser, token } = response;
 
       const mappedUser: User = {
         id: backendUser.userId,
@@ -135,16 +135,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const requestPasswordReset = async (email: string) => {
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await authService.forgotPassword(email);
     localStorage.setItem('reset_email', email);
   };
 
-  const resetPassword = async (_email: string, _otp: string, _newPassword: string) => {
-    await new Promise(resolve => setTimeout(resolve, 1000));
+  const resetPassword = async (email: string, otp: string, newPassword: string) => {
+    const verifyResponse = await authService.verifyResetOtp(email, otp);
+    await authService.resetPassword({
+      newPassword,
+      token: verifyResponse?.resetToken,
+    });
     localStorage.removeItem('reset_email');
   };
 
   const logout = () => {
+    authService.logout().catch(() => {
+      // Client cleanup below is the critical path.
+    });
     setUser(null);
     localStorage.removeItem('synccode_user');
     localStorage.removeItem('token');

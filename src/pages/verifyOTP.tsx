@@ -6,7 +6,6 @@ import { useAuth } from '../context/auth.context';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '../components/ui/input-otp';
-import axios from 'axios';
 
 export default function VerifyOtp() {
   const [otp, setOtp] = useState('');
@@ -24,10 +23,7 @@ export default function VerifyOtp() {
 
     setIsLoading(true);
     try {
-      await axios.post("https://synccode-backend-production.up.railway.app/auth/verify-email", {
-        email,
-        otp,
-      }, { withCredentials: true });
+      await verifyOtp(email, otp);
       toast({
         title: 'Account verified!',
         description: 'Your account has been successfully verified.',

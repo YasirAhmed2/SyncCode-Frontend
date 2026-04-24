@@ -7,6 +7,7 @@ import { AuthLayout } from '../components/auth.components';
 import { useAuth } from '../context/auth.context';
 import { Loader2, Mail, ArrowLeft } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
+import { authService } from '../lib/authService';
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
@@ -17,19 +18,30 @@ export default function ForgotPassword() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!email.trim()) {
+      toast({
+        title: 'Email required',
+        description: 'Please enter your email address.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsLoading(true);
 
     try {
       await requestPasswordReset(email);
       toast({
-        title: 'Reset email sent!',
-        description: 'Check your inbox for password reset instructions.',
+        title: 'OTP sent!',
+        description: 'Check your inbox for the verification code.',
       });
       navigate('/reset-password', { state: { email } });
-    } catch (error) {
+    } catch (error: any) {
+      const errorMessage = error?.response?.data?.message || 'Something went wrong. Please try again.';
       toast({
         title: 'Request failed',
-        description: 'Something went wrong. Please try again.',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {
@@ -40,7 +52,7 @@ export default function ForgotPassword() {
   return (
     <AuthLayout
       title="Forgot password?"
-      subtitle="No worries, we'll send you reset instructions"
+      subtitle="No worries, we'll send you a verification code"
     >
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="space-y-2">
@@ -59,14 +71,14 @@ export default function ForgotPassword() {
           </div>
         </div>
 
-        <Button type="submit" variant="hero" className="w-full" size="lg" disabled={isLoading}>
+        <Button type="submit" variant="hero" className="w-full" size="lg" disabled={isLoading || !email}>
           {isLoading ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin" />
               Sending...
             </>
           ) : (
-            'Send Reset Link'
+            'Send Verification Code'
           )}
         </Button>
       </form>
