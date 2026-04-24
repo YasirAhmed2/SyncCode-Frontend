@@ -6,8 +6,8 @@ import api from "./api";
 
 export const roomService = {
   // Create coding room
-  createRoom: async (language: "javascript" | "python") => {
-    const res = await api.post("/rooms/create", { language });
+  createRoom: async (language: "javascript" | "python", name: string) => {
+    const res = await api.post("/rooms/create", { language, name });
     return res.data;
   },
 

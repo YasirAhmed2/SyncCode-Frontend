@@ -22,6 +22,9 @@ interface Room {
   id: string;
   name: string;
   createdBy: string;
+  teacherId: string;
+  mode: 'broadcast' | 'practice';
+  isLocked: boolean;
   participants: Participant[];
   createdAt: Date;
 }
@@ -32,7 +35,7 @@ interface RoomContextType {
   messages: Message[];
   code: string;
   language: 'javascript' | 'python';
-  createRoom: (language: "javascript" | "python") => Promise<Room>;
+  createRoom: (language: "javascript" | "python", name: string) => Promise<Room>;
   joinRoom: (roomId: string) => Promise<void>;
   leaveRoom: () => void;
   sendMessage: (content: string, sender?: { userId: string; userName: string; avatarColor?: string }) => void;
@@ -55,16 +58,19 @@ export function RoomProvider({ children }: { children: ReactNode }) {
   const [code, setCode] = useState<string>('// Start coding here...\nconsole.log("Hello, SyncCode!");');
   const [language, setLanguage] = useState<'javascript' | 'python'>('javascript');
 
-  const createRoom = async (language: "javascript" | "python"): Promise<Room> => {
+  const createRoom = async (language: "javascript" | "python", name: string): Promise<Room> => {
     // Note: Dashboard usually calls roomService.createRoom directly then navigates.
     // But if called via context, we should forward to service. 
     // However, the Room interface here in context (id, name, createdBy, participants) might differ slightly from backend response structure.
     // Let's adapt.
-    const data = await roomService.createRoom(language);
+    const data = await roomService.createRoom(language, name);
     const newRoom: Room = {
       id: data.room.roomId,
       name: data.room.name || 'Untitled Room',
       createdBy: data.room.createdBy,
+      teacherId: data.room.teacherId,
+      mode: data.room.mode || 'broadcast',
+      isLocked: Boolean(data.room.isLocked),
       participants: (data.room.participants || []).map((p: any) => ({
         id: p._id || p,
         name: p.name || 'User',
@@ -92,7 +98,10 @@ export function RoomProvider({ children }: { children: ReactNode }) {
       const joinedRoom: Room = {
         id: data.room.roomId,
         name: data.room.name || 'Joined Room',
-        createdBy: data.room.createdBy,
+        createdBy: data.room.createdBy || data.room.teacherId,
+        teacherId: data.room.teacherId,
+        mode: data.room.mode || 'broadcast',
+        isLocked: Boolean(data.room.isLocked),
         participants: (data.room.participants || []).map((p: any) => ({
           id: p._id || p.id || p,
           name: p.name || 'Mates',

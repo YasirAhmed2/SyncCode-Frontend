@@ -50,6 +50,7 @@ export default function Dashboard() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isJoinDialogOpen, setIsJoinDialogOpen] = useState(false);
   const [language, setLanguage] = useState<'javascript' | 'python'>('javascript');
+  const [roomName, setRoomName] = useState('');
   const [joinRoomId, setJoinRoomId] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -69,11 +70,17 @@ export default function Dashboard() {
   }, []);
 
   const handleCreateRoom = async () => {
+    if (!roomName.trim()) {
+      toast({ title: 'Room name required', description: 'Please enter a room name before creating.', variant: 'destructive' });
+      return;
+    }
+
     setIsLoading(true);
     try {
-      const newRoom = await createRoom(language);
-      toast({ title: 'Room created!', description: `"${newRoom.id}" is ready.` });
+      const newRoom = await createRoom(language, roomName.trim());
+      toast({ title: 'Room created!', description: `"${newRoom.name}" is ready.` });
       setIsCreateDialogOpen(false);
+      setRoomName('');
       navigate(`/rooms/${newRoom.id}`);
     } catch {
       toast({ title: 'Failed to create room', description: 'Something went wrong.', variant: 'destructive' });
@@ -195,6 +202,18 @@ export default function Dashboard() {
                 </DialogHeader>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '18px', paddingTop: '8px' }}>
                   <div>
+                    <Label htmlFor="roomName" style={{ color: '#9CA3AF', fontSize: '13px' }}>Room Name</Label>
+                    <Input
+                      id="roomName"
+                      placeholder="e.g. DSA Revision Batch"
+                      value={roomName}
+                      onChange={(e) => setRoomName(e.target.value)}
+                      maxLength={80}
+                      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: '#f1f5f9', marginTop: '8px' }}
+                      className="placeholder:text-white/25 focus:border-indigo-500/50 focus:ring-0"
+                    />
+                  </div>
+                  <div>
                     <label style={{ fontSize: '13px', fontWeight: 500, color: '#9CA3AF', display: 'block', marginBottom: '10px' }}>Select Language</label>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                       {(['javascript', 'python'] as const).map(lang => {
@@ -215,7 +234,7 @@ export default function Dashboard() {
                       })}
                     </div>
                   </div>
-                  <button onClick={handleCreateRoom} disabled={!language || isLoading}
+                  <button onClick={handleCreateRoom} disabled={!language || !roomName.trim() || isLoading}
                     style={{ width: '100%', padding: '13px', borderRadius: '12px', background: '#4F46E5', color: '#fff', fontWeight: 700, border: 'none', cursor: 'pointer', boxShadow: '0 4px 16px rgba(99,102,241,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', opacity: isLoading ? 0.7 : 1, transition: 'all 0.15s', fontSize: '14px' }}
                   >
                     {isLoading ? <><div className="spinner-sm" /> Creating…</> : <><Plus size={15} /> Create Room</>}
@@ -324,6 +343,9 @@ export default function Dashboard() {
                           {copiedId === id ? <Check size={14} color="#34D399" /> : <Copy size={14} />}
                         </button>
                       </div>
+                      <p style={{ fontSize: '14px', fontWeight: 700, color: '#e2e8f0', marginBottom: '8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {room.name || 'Untitled Room'}
+                      </p>
                       <p style={{ fontSize: '11px', fontFamily: 'JetBrains Mono, monospace', color: 'rgba(255,255,255,0.25)', marginBottom: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{id}</p>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', color: '#4B5563' }}>
                         <Clock size={12} />

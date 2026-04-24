@@ -5,7 +5,7 @@ import Editor from '@monaco-editor/react';
 import { useAuth } from '../context/auth.context';
 import { useRoom } from '../context/room.context';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Play, Copy, Check, Users, MessageCircle, Code2, ChevronLeft, Send, Terminal, X, Loader2, Save, Wifi, WifiOff } from 'lucide-react';
+import { Play, Copy, Check, Users, MessageCircle, Code2, ChevronLeft, Send, Terminal, X, Loader2, Save, Wifi, WifiOff, Lock, Unlock } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { roomService } from '../lib/roomService';
@@ -38,6 +38,9 @@ export default function Room() {
   const [activeParticipants, setActiveParticipants] = useState<Array<{ id: string; name: string; avatarColor: string; isOnline: boolean }>>(
     currentRoom?.participants || [{ id: user?.id || '1', name: user?.name || 'You', avatarColor: user?.avatarColor || '#4F46E5', isOnline: true }]
   );
+  const [isEditorLocked, setIsEditorLocked] = useState<boolean>(Boolean(currentRoom?.isLocked));
+  const [teacherId, setTeacherId] = useState<string | null>(currentRoom?.teacherId || null);
+  const [selectedParticipantId, setSelectedParticipantId] = useState<string>('');
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const outputEndRef = useRef<HTMLDivElement>(null);
@@ -46,6 +49,11 @@ export default function Room() {
   const isRemoteUpdate = useRef(false);
   const cursorDecorations = useRef<Map<string, string[]>>(new Map());
   const isJoiningRoom = useRef(false); // guard against re-entrant joinRoom calls
+  const pendingEmitCodeRef = useRef<string | null>(null);
+  const emitCodeTimerRef = useRef<number | null>(null);
+
+  const isTeacher = Boolean(user?.id && teacherId && user.id === teacherId);
+  const isStudentReadOnly = !isTeacher && isEditorLocked;
 
   const normalizeMessage = (raw: any): Message => ({
     id: raw?.id || `msg_${Date.now()}`,
@@ -80,6 +88,22 @@ export default function Room() {
     });
   };
 
+  const queueCodeEmit = (nextCode: string) => {
+    pendingEmitCodeRef.current = nextCode;
+    if (emitCodeTimerRef.current !== null) {
+      return;
+    }
+
+    emitCodeTimerRef.current = window.setTimeout(() => {
+      const latestCode = pendingEmitCodeRef.current;
+      pendingEmitCodeRef.current = null;
+      emitCodeTimerRef.current = null;
+
+      if (!latestCode) return;
+      socket.emit('code-change', { roomId, code: latestCode, language, userId: user?.id, userName: user?.name });
+    }, 35);
+  };
+
   useEffect(() => {
     if (roomId && user) {
       socket.auth = { token: localStorage.getItem('token') };
@@ -90,14 +114,28 @@ export default function Room() {
         const newCode = typeof updateData === 'string' ? updateData : updateData.code;
         if (editorRef.current && newCode !== editorRef.current.getValue()) {
           const model = editorRef.current.getModel();
-          if (model) { isRemoteUpdate.current = true; editorRef.current.executeEdits('remote-sync', [{ range: model.getFullModelRange(), text: newCode, forceMoveMarkers: true }]); updateCode(newCode); isRemoteUpdate.current = false; if (updateData.changedBy && updateData.changedBy.userId !== user.id) toast({ title: `${updateData.changedBy.userName} updated the code`, duration: 2000 }); }
+          if (model) { isRemoteUpdate.current = true; editorRef.current.executeEdits('remote-sync', [{ range: model.getFullModelRange(), text: newCode, forceMoveMarkers: true }]); updateCode(newCode); isRemoteUpdate.current = false; }
         }
       });
       socket.on('cursor-update', (cursorData: any) => { if (cursorData.userId !== user.id) handleRemoteCursorUpdate(cursorData); });
       socket.on('participants-updated', ({ participants }: any) => setActiveParticipants(participants));
-      socket.on('user-joined', (joinData: any) => { joinRoom(roomId); toast({ title: `${joinData.userName} joined the room`, duration: 2000 }); });
+      socket.on('user-joined', (joinData: any) => { toast({ title: `${joinData.userName} joined the room`, duration: 2000 }); });
       socket.on('user-left', () => undefined);
       socket.on('language-update', (updateData: any) => { const newLang = typeof updateData === 'string' ? updateData : updateData.language; setLanguage(newLang); if (updateData.changedBy) toast({ title: `${updateData.changedBy.userName} changed language to ${newLang}`, duration: 2000 }); });
+      socket.on('room-control-state', (state: any) => {
+        if (state?.teacherId) {
+          setTeacherId(String(state.teacherId));
+        }
+        if (typeof state?.isLocked === 'boolean') {
+          setIsEditorLocked(state.isLocked);
+        }
+      });
+      socket.on('room-lock-updated', (data: any) => {
+        if (typeof data?.isLocked === 'boolean') {
+          setIsEditorLocked(data.isLocked);
+          toast({ title: data.isLocked ? 'Practice disabled by teacher' : 'Practice enabled for students', duration: 2000 });
+        }
+      });
       socket.on('room-chat-history', ({ messages: roomMessages }: any) => {
         const normalized = Array.isArray(roomMessages) ? roomMessages.map(normalizeMessage) : [];
         setRoomMessages(normalized);
@@ -105,12 +143,42 @@ export default function Room() {
       socket.on('chat-message', (messageData: any) => {
         addMessage(normalizeMessage(messageData));
       });
+      socket.on('participant-removed', (data: any) => {
+        if (!data?.targetUserId) return;
+        if (data.targetUserId === user.id) {
+          toast({ title: 'You were removed from this room', description: `Removed by ${data.removedBy || 'teacher'}`, variant: 'destructive' });
+          leaveRoom();
+          navigate('/dashboard');
+          return;
+        }
+        toast({ title: 'Participant removed', description: `${data.removedBy || 'Teacher'} removed a participant.` });
+      });
+      socket.on('removed-from-room', (data: any) => {
+        toast({ title: 'Removed from room', description: `Removed by ${data?.removedBy || 'teacher'}`, variant: 'destructive' });
+        leaveRoom();
+        navigate('/dashboard');
+      });
       return () => {
-        socket.off('code-update'); socket.off('cursor-update'); socket.off('language-update'); socket.off('participants-updated'); socket.off('user-joined'); socket.off('user-left'); socket.off('room-chat-history'); socket.off('chat-message');
+        socket.off('code-update'); socket.off('cursor-update'); socket.off('language-update'); socket.off('participants-updated'); socket.off('user-joined'); socket.off('user-left'); socket.off('room-control-state'); socket.off('room-lock-updated'); socket.off('room-chat-history'); socket.off('chat-message'); socket.off('participant-removed'); socket.off('removed-from-room');
+        if (emitCodeTimerRef.current !== null) {
+          window.clearTimeout(emitCodeTimerRef.current);
+          emitCodeTimerRef.current = null;
+        }
+        pendingEmitCodeRef.current = null;
         socket.emit('leave-room', { roomId, userId: user.id }); socket.disconnect(); setIsConnected(false);
       };
     }
   }, [roomId, user]);
+
+  useEffect(() => {
+    if (!currentRoom) return;
+    if (currentRoom.teacherId) {
+      setTeacherId(currentRoom.teacherId);
+    }
+    if (typeof currentRoom.isLocked === 'boolean') {
+      setIsEditorLocked(currentRoom.isLocked);
+    }
+  }, [currentRoom]);
 
   useEffect(() => {
     if (roomId && !currentRoom && !isJoiningRoom.current) {
@@ -251,8 +319,18 @@ export default function Room() {
     setNewMessage('');
   };
   const handleLeave = () => { leaveRoom(); navigate('/dashboard'); };
+  const handleToggleLock = () => {
+    if (!roomId || !isTeacher) return;
+    socket.emit('lock-editor', { roomId, isLocked: !isEditorLocked });
+  };
+  const handleRemoveParticipant = () => {
+    if (!roomId || !isTeacher || !selectedParticipantId) return;
+    socket.emit('remove-participant', { roomId, targetUserId: selectedParticipantId });
+    setSelectedParticipantId('');
+  };
 
   const participants = activeParticipants && activeParticipants.length > 0 ? activeParticipants : [{ id: user?.id || '1', name: user?.name || 'You', avatarColor: user?.avatarColor || '#4F46E5', isOnline: true }];
+  const removableParticipants = participants.filter((p) => p.id !== teacherId);
   const allMessages = messages
     .slice()
     .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
@@ -284,6 +362,11 @@ export default function Room() {
             {isConnected ? <Wifi size={11} /> : <WifiOff size={11} />}
             {isConnected ? 'Live' : 'Offline'}
           </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ padding: '3px 8px', borderRadius: '99px', fontSize: '11px', fontWeight: 600, border: '1px solid rgba(255,255,255,0.08)', background: isEditorLocked ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.05)', color: isEditorLocked ? '#FCA5A5' : 'rgba(241,245,249,0.7)' }}>
+              {isEditorLocked ? 'Practice Disabled' : 'Practice Enabled'}
+            </span>
+          </div>
         </div>
 
         {/* Right */}
@@ -309,6 +392,38 @@ export default function Room() {
               <SelectItem value="python">Python</SelectItem>
             </SelectContent>
           </Select>
+
+          {isTeacher && (
+            <>
+              <button
+                onClick={handleToggleLock}
+                style={{ height: '32px', padding: '0 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.04)', color: '#E2E8F0', border: '1px solid rgba(255,255,255,0.09)', cursor: 'pointer', transition: 'all 0.15s' }}
+                className="hover:text-white hover:border-white/20 hover:bg-white/[0.07]"
+              >
+                {isEditorLocked ? <Unlock size={13} /> : <Lock size={13} />}
+                {isEditorLocked ? 'Enable Practice' : 'Disable Practice'}
+              </button>
+              <select
+                value={selectedParticipantId}
+                onChange={(e) => setSelectedParticipantId(e.target.value)}
+                style={{ height: '32px', minWidth: '170px', padding: '0 10px', borderRadius: '8px', fontSize: '12px', fontWeight: 500, background: 'rgba(255,255,255,0.04)', color: '#E2E8F0', border: '1px solid rgba(255,255,255,0.09)', outline: 'none' }}
+              >
+                <option value="" style={{ background: '#0D1117', color: '#94A3B8' }}>Select participant</option>
+                {removableParticipants.map((participant) => (
+                  <option key={participant.id} value={participant.id} style={{ background: '#0D1117', color: '#E2E8F0' }}>
+                    {participant.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={handleRemoveParticipant}
+                disabled={!selectedParticipantId}
+                style={{ height: '32px', padding: '0 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, display: 'flex', alignItems: 'center', background: 'rgba(239,68,68,0.18)', color: '#FCA5A5', border: '1px solid rgba(239,68,68,0.35)', cursor: selectedParticipantId ? 'pointer' : 'not-allowed', opacity: selectedParticipantId ? 1 : 0.55, transition: 'all 0.15s' }}
+              >
+                Remove Participant
+              </button>
+            </>
+          )}
 
           {/* Run */}
           <button onClick={handleExecute} disabled={isExecuting}
@@ -358,13 +473,14 @@ export default function Room() {
               value={code}
               onMount={handleEditorDidMount}
               onChange={(value) => {
+                if (isStudentReadOnly) return;
                 if (value !== undefined && !isRemoteUpdate.current) {
                   updateCode(value);
-                  socket.emit('code-change', { roomId, code: value, language, userId: user?.id, userName: user?.name });
+                  queueCodeEmit(value);
                 }
               }}
               theme="vs-dark"
-              options={{ fontSize: 14, fontFamily: 'JetBrains Mono, monospace', fontLigatures: true, minimap: { enabled: false }, padding: { top: 18, bottom: 18 }, scrollBeyondLastLine: false, automaticLayout: true, tabSize: 2, wordWrap: 'on', lineNumbersMinChars: 3, renderLineHighlight: 'gutter', cursorBlinking: 'smooth', smoothScrolling: true }}
+              options={{ readOnly: isStudentReadOnly, fontSize: 14, fontFamily: 'JetBrains Mono, monospace', fontLigatures: true, minimap: { enabled: false }, padding: { top: 18, bottom: 18 }, scrollBeyondLastLine: false, automaticLayout: true, tabSize: 2, wordWrap: 'on', lineNumbersMinChars: 3, renderLineHighlight: 'gutter', cursorBlinking: 'smooth', smoothScrolling: true }}
             />
           </div>
 

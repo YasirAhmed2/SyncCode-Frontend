@@ -57,6 +57,7 @@ export default function Dashboard() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isJoinDialogOpen, setIsJoinDialogOpen] = useState(false);
   const [language, setLanguage] = useState<'javascript' | 'python'>('javascript');
+  const [roomName, setRoomName] = useState('');
   const [joinRoomId, setJoinRoomId] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -76,11 +77,16 @@ export default function Dashboard() {
   }, []);
 
   const handleCreateRoom = async () => {
+    if (!roomName.trim()) {
+      toast({ title: 'Room name required', description: 'Please enter a room name.', variant: 'destructive' });
+      return;
+    }
     setIsLoading(true);
     try {
-      const newRoom = await createRoom(language);
+      const newRoom = await createRoom(language, roomName.trim());
       toast({ title: 'Room created!', description: `Room is ready to go.` });
       setIsCreateDialogOpen(false);
+      setRoomName('');
       setTimeout(() => navigate(`/rooms/${newRoom.id}`), 500);
     } catch (err) {
       toast({ title: 'Failed to create room', description: 'Something went wrong.', variant: 'destructive' });
@@ -201,6 +207,18 @@ export default function Dashboard() {
 
                   <div className="space-y-5 py-6">
                     <div>
+                      <Label htmlFor="room-name" className="text-white mb-3 block font-semibold">
+                        Room Name
+                      </Label>
+                      <Input
+                        id="room-name"
+                        placeholder="e.g. DSA Revision Batch"
+                        value={roomName}
+                        onChange={(e) => setRoomName(e.target.value)}
+                        className="bg-white/5 border-white/10 text-white placeholder:text-gray-600 rounded-xl"
+                      />
+                    </div>
+                    <div>
                       <Label htmlFor="lang" className="text-white mb-3 block font-semibold">
                         Programming Language
                       </Label>
@@ -223,7 +241,7 @@ export default function Dashboard() {
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
                       onClick={handleCreateRoom}
-                      disabled={isLoading}
+                      disabled={isLoading || !roomName.trim()}
                       className="w-full px-6 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold hover:opacity-90 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                     >
                       {isLoading ? (
