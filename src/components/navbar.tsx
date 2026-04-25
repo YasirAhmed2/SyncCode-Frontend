@@ -4,6 +4,7 @@ import { useAuth } from '../context/auth.context';
 import { Code2, LogOut, LayoutDashboard } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useState, useEffect } from 'react';
+import { ThemeToggle } from './theme-toggle';
 
 export function Navbar() {
   const { isAuthenticated, user, logout } = useAuth();
@@ -26,48 +27,23 @@ export function Navbar() {
       initial={{ y: -20, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.4 }}
-      className="fixed top-0 left-0 right-0 z-50 transition-all duration-300"
-      style={{
-        background: scrolled
-          ? 'rgba(11, 15, 25, 0.95)'
-          : 'rgba(11, 15, 25, 0.75)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
-        borderBottom: scrolled
-          ? '1px solid rgba(255,255,255,0.08)'
-          : '1px solid rgba(255,255,255,0.04)',
-        boxShadow: scrolled ? '0 4px 24px rgba(0,0,0,0.35)' : 'none',
-      }}
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 backdrop-blur-xl ${
+        scrolled 
+          ? 'bg-background/95 border-b border-border/80 shadow-[0_4px_24px_rgba(0,0,0,0.1)]' 
+          : 'bg-background/75 border-b border-border/10 shadow-none'
+      }`}
     >
       <div className="container mx-auto px-5 h-16 flex items-center justify-between">
 
         {/* Logo */}
         <Link to="/" className="flex items-center gap-2.5 group">
           <div
-            style={{
-              width: '34px', height: '34px',
-              borderRadius: '10px',
-              background: '#4F46E5',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 2px 8px rgba(99,102,241,0.3)',
-              transition: 'box-shadow 0.2s',
-            }}
-            className="group-hover:shadow-[0_4px_16px_rgba(99,102,241,0.4)]"
+            className="w-[34px] h-[34px] rounded-[10px] bg-primary flex items-center justify-center transition-shadow duration-200 shadow-[0_2px_8px_rgba(99,102,241,0.3)] group-hover:shadow-[0_4px_16px_rgba(99,102,241,0.4)]"
           >
             <Code2 size={17} color="white" />
           </div>
-          <span
-            style={{
-              fontSize: '18px',
-              fontWeight: 700,
-              color: '#f1f5f9',
-              letterSpacing: '-0.01em',
-            }}
-          >
-            Sync
-            <span style={{ color: '#818CF8' }}>Code</span>
+          <span className="text-[18px] font-bold text-foreground tracking-[-0.01em]">
+            Sync<span className="text-primary">Code</span>
           </span>
         </Link>
 
@@ -78,70 +54,25 @@ export function Navbar() {
               <Link to="/dashboard">
                 <motion.div
                   whileHover={{ scale: 1.02 }}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '7px',
-                    padding: '7px 14px',
-                    borderRadius: '10px',
-                    fontSize: '14px',
-                    fontWeight: 500,
-                    color: 'rgba(241,245,249,0.55)',
-                    transition: 'all 0.15s',
-                  }}
-                  className="hover:text-white hover:bg-white/[0.05]"
+                  className="flex items-center gap-[7px] px-[14px] py-[7px] rounded-[10px] text-[14px] font-medium text-muted-foreground transition-all duration-150 hover:text-foreground hover:bg-muted"
                 >
                   <LayoutDashboard size={15} />
                   Dashboard
                 </motion.div>
               </Link>
 
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  paddingLeft: '12px',
-                  marginLeft: '4px',
-                  borderLeft: '1px solid rgba(255,255,255,0.08)',
-                }}
-              >
+              <div className="flex items-center gap-[10px] pl-[12px] ml-[4px] border-l border-border/50">
+                <ThemeToggle />
+                
                 {/* Avatar chip */}
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '9px',
-                    padding: '5px 12px 5px 6px',
-                    borderRadius: '10px',
-                    background: 'rgba(255,255,255,0.04)',
-                    border: '1px solid rgba(255,255,255,0.07)',
-                  }}
-                >
+                <div className="flex items-center gap-[9px] py-[5px] pr-[12px] pl-[6px] rounded-[10px] bg-card border border-border/50">
                   <div
-                    style={{
-                      width: '26px', height: '26px',
-                      borderRadius: '50%',
-                      background: user?.avatarColor || '#4F46E5',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '11px',
-                      fontWeight: 700,
-                      color: '#fff',
-                      flexShrink: 0,
-                    }}
+                    className="w-[26px] h-[26px] rounded-full flex items-center justify-center text-[11px] font-bold text-white shrink-0"
+                    style={{ background: user?.avatarColor || '#4F46E5' }}
                   >
                     {user?.name?.charAt(0).toUpperCase()}
                   </div>
-                  <span
-                    style={{
-                      fontSize: '13px',
-                      fontWeight: 500,
-                      color: 'rgba(241,245,249,0.7)',
-                    }}
-                    className="hidden sm:inline"
-                  >
+                  <span className="text-[13px] font-medium text-foreground/80 hidden sm:inline">
                     {user?.name}
                   </span>
                 </div>
@@ -152,62 +83,33 @@ export function Navbar() {
                   whileTap={{ scale: 0.95 }}
                   onClick={handleLogout}
                   title="Sign out"
-                  style={{
-                    width: '32px', height: '32px',
-                    borderRadius: '8px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: 'rgba(241,245,249,0.35)',
-                    transition: 'all 0.15s',
-                    border: 'none',
-                    background: 'transparent',
-                    cursor: 'pointer',
-                  }}
-                  className="hover:text-red-400 hover:bg-red-500/10"
+                  className="w-[32px] h-[32px] rounded-[8px] flex items-center justify-center text-muted-foreground transition-all duration-150 hover:text-destructive hover:bg-destructive/10 cursor-pointer"
                 >
                   <LogOut size={15} />
                 </motion.button>
               </div>
             </>
           ) : (
-            <>
+            <div className="flex items-center gap-2">
+              <ThemeToggle />
               <Link to="/login">
                 <motion.div
                   whileHover={{ scale: 1.02 }}
-                  style={{
-                    padding: '7px 16px',
-                    borderRadius: '10px',
-                    fontSize: '14px',
-                    fontWeight: 500,
-                    color: 'rgba(241,245,249,0.55)',
-                    transition: 'all 0.15s',
-                  }}
-                  className="hover:text-white hover:bg-white/[0.05]"
+                  className="px-[16px] py-[7px] rounded-[10px] text-[14px] font-medium text-muted-foreground transition-all duration-150 hover:text-foreground hover:bg-muted"
                 >
                   Sign In
                 </motion.div>
               </Link>
               <Link to="/register">
                 <motion.div
-                  whileHover={{ scale: 1.03, translateY: -1 }}
+                  whileHover={{ scale: 1.03, y: -1 }}
                   whileTap={{ scale: 0.97 }}
-                  style={{
-                    padding: '8px 18px',
-                    borderRadius: '10px',
-                    fontSize: '14px',
-                    fontWeight: 600,
-                    color: '#fff',
-                    background: '#4F46E5',
-                    boxShadow: '0 2px 8px rgba(99,102,241,0.25)',
-                    transition: 'all 0.15s',
-                  }}
-                  className="hover:shadow-[0_4px_16px_rgba(99,102,241,0.35)]"
+                  className="px-[18px] py-[8px] rounded-[10px] text-[14px] font-semibold text-white bg-primary shadow-[0_2px_8px_rgba(99,102,241,0.25)] transition-all duration-150 hover:shadow-[0_4px_16px_rgba(99,102,241,0.35)]"
                 >
                   Get Started →
                 </motion.div>
               </Link>
-            </>
+            </div>
           )}
         </nav>
       </div>

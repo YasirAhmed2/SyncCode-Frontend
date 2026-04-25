@@ -45,17 +45,7 @@ export default function Register() {
   };
 
   const inputStyle = {
-    base: "w-full py-3 rounded-xl text-sm text-white placeholder:text-white/25 outline-none transition-all duration-200",
-    bg: { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' },
-  };
-
-  const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
-    e.target.style.borderColor = 'rgba(99,102,241,0.55)';
-    e.target.style.boxShadow = '0 0 0 3px rgba(99,102,241,0.1)';
-  };
-  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
-    e.target.style.borderColor = 'rgba(255,255,255,0.09)';
-    e.target.style.boxShadow = 'none';
+    base: "w-full py-3 rounded-xl text-sm text-foreground placeholder:text-muted-foreground outline-none transition-all duration-200 bg-background/50 border border-border/50 focus:border-primary focus:ring-[3px] focus:ring-primary/10",
   };
 
   return (
@@ -66,9 +56,9 @@ export default function Register() {
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Name */}
         <div className="space-y-1.5">
-          <label htmlFor="name" className="text-sm font-medium text-white/60 block">Full Name</label>
+          <label htmlFor="name" className="text-sm font-medium text-foreground block">Full Name</label>
           <div className="relative">
-            <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
+            <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <input
               id="name"
               type="text"
@@ -77,18 +67,15 @@ export default function Register() {
               onChange={(e) => setName(e.target.value)}
               required
               className={`${inputStyle.base} pl-10 pr-4`}
-              style={inputStyle.bg}
-              onFocus={handleFocus}
-              onBlur={handleBlur}
             />
           </div>
         </div>
 
         {/* Email */}
         <div className="space-y-1.5">
-          <label htmlFor="email" className="text-sm font-medium text-white/60 block">Email</label>
+          <label htmlFor="email" className="text-sm font-medium text-foreground block">Email</label>
           <div className="relative">
-            <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
+            <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <input
               id="email"
               type="email"
@@ -97,18 +84,15 @@ export default function Register() {
               onChange={(e) => setEmail(e.target.value)}
               required
               className={`${inputStyle.base} pl-10 pr-4`}
-              style={inputStyle.bg}
-              onFocus={handleFocus}
-              onBlur={handleBlur}
             />
           </div>
         </div>
 
         {/* Password */}
         <div className="space-y-1.5">
-          <label htmlFor="password" className="text-sm font-medium text-white/60 block">Password</label>
+          <label htmlFor="password" className="text-sm font-medium text-foreground block">Password</label>
           <div className="relative">
-            <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
+            <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <input
               id="password"
               type={showPassword ? 'text' : 'password'}
@@ -118,14 +102,11 @@ export default function Register() {
               required
               minLength={8}
               className={`${inputStyle.base} pl-10 pr-11`}
-              style={inputStyle.bg}
-              onFocus={handleFocus}
-              onBlur={handleBlur}
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors"
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
             >
               {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
@@ -156,11 +137,7 @@ export default function Register() {
         <button
           type="submit"
           disabled={isLoading}
-          className="w-full py-3.5 rounded-xl font-bold text-white text-sm transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-2"
-          style={{
-            background: isLoading ? 'rgba(79,70,229,0.6)' : '#4F46E5',
-            boxShadow: isLoading ? 'none' : '0 4px 16px rgba(99,102,241,0.3)',
-          }}
+          className="w-full py-3.5 rounded-xl font-bold text-primary-foreground text-sm transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-2 shadow-[0_4px_16px_rgba(99,102,241,0.3)] bg-primary hover:bg-primary/90"
         >
           {isLoading ? (
             <><Loader2 className="w-4 h-4 animate-spin" /> Creating account…</>
@@ -170,17 +147,17 @@ export default function Register() {
         </button>
 
         {/* Terms note */}
-        <p className="text-center text-xs text-white/25 leading-relaxed">
+        <p className="text-center text-xs text-muted-foreground leading-relaxed">
           By signing up you agree to our{' '}
-          <span className="text-indigo-400 cursor-pointer hover:underline">Terms</span>{' '}
+          <span className="text-primary cursor-pointer hover:underline">Terms</span>{' '}
           &{' '}
-          <span className="text-indigo-400 cursor-pointer hover:underline">Privacy Policy</span>
+          <span className="text-primary cursor-pointer hover:underline">Privacy Policy</span>
         </p>
       </form>
 
-      <p className="mt-6 text-center text-sm text-white/35">
+      <p className="mt-6 text-center text-sm text-muted-foreground">
         Already have an account?{' '}
-        <Link to="/login" className="text-indigo-400 font-semibold hover:text-indigo-300 transition-colors">
+        <Link to="/login" className="text-primary font-semibold hover:text-primary/80 transition-colors">
           Sign in
         </Link>
       </p>

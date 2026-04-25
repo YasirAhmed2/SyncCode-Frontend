@@ -15,6 +15,7 @@ import ForgotPassword from "./pages/forgotPassword.page";
 import ResetPassword from "./pages/resetPassword.page";
 import Dashboard from "./pages/dashboard";
 import Room from "./pages/rooms";
+import SessionReportPage from "./pages/session-report.page";
 import NotFound from "./pages/notFound";
 
 const queryClient = new QueryClient();
@@ -99,6 +100,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Room />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/rooms/:roomId/report"
+        element={
+          <ProtectedRoute>
+            <SessionReportPage />
           </ProtectedRoute>
         }
       />

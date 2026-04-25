@@ -2,6 +2,7 @@ import { type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Code2, Zap, Users, Terminal } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { ThemeToggle } from './theme-toggle';
 
 interface AuthLayoutProps {
   children: ReactNode;
@@ -11,10 +12,10 @@ interface AuthLayoutProps {
 
 export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', background: '#0B0F19' }}>
+    <div className="min-h-screen flex bg-background">
 
       {/* Left — Branding Panel */}
-      <div className="hidden lg:flex lg:w-1/2" style={{ position: 'relative', overflow: 'hidden', flexDirection: 'column', justifyContent: 'space-between', padding: '48px 56px', background: '#0D1117', borderRight: '1px solid rgba(255,255,255,0.06)' }}>
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden flex-col justify-between px-14 py-12 bg-card border-r border-border/50">
 
         {/* Subtle orbs */}
         <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
@@ -25,76 +26,79 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
         </div>
 
         {/* Logo */}
-        <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', position: 'relative', zIndex: 1 }}>
-          <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: '#4F46E5', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(99,102,241,0.3)' }}>
+        <Link to="/" className="flex items-center gap-2.5 relative z-10 no-underline">
+          <div className="w-[38px] h-[38px] rounded-[10px] bg-primary flex items-center justify-center shadow-[0_4px_16px_rgba(99,102,241,0.3)]">
             <Code2 size={19} color="white" />
           </div>
-          <span style={{ fontSize: '20px', fontWeight: 700, color: '#f1f5f9', letterSpacing: '-0.01em' }}>
-            Sync<span style={{ color: '#818CF8' }}>Code</span>
+          <span className="text-[20px] font-bold text-foreground tracking-[-0.01em]">
+            Sync<span className="text-primary">Code</span>
           </span>
         </Link>
 
         {/* Hero copy */}
-        <div style={{ position: 'relative', zIndex: 1 }}>
-          <h1 style={{ fontSize: 'clamp(2rem, 3.5vw, 2.75rem)', fontWeight: 800, color: '#f1f5f9', lineHeight: 1.15, letterSpacing: '-0.02em', marginBottom: '16px' }}>
+        <div className="relative z-10">
+          <h1 className="text-[clamp(2rem,3.5vw,2.75rem)] font-extrabold text-foreground leading-[1.15] tracking-[-0.02em] mb-4">
             Collaborate on code<br />
-            <span style={{ color: '#818CF8' }}>in real-time</span>
+            <span className="text-primary">in real-time</span>
           </h1>
-          <p style={{ fontSize: '15px', color: '#6B7280', lineHeight: 1.7, maxWidth: '380px', marginBottom: '36px' }}>
+          <p className="text-[15px] text-muted-foreground leading-[1.7] max-w-[380px] mb-9">
             Join thousands of developers writing, executing, and discussing code together — all in one live coding room.
           </p>
 
           {/* Feature pills */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div className="flex flex-col gap-3">
             {[
               { icon: <Zap size={14} />, text: 'Real-time sync under 50ms' },
               { icon: <Terminal size={14} />, text: 'Instant sandboxed code execution' },
               { icon: <Users size={14} />, text: 'Built-in team chat' },
             ].map((f, i) => (
               <motion.div key={i} initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.25 + i * 0.08 }}
-                style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px' }}
+                className="flex items-center gap-2.5 text-[14px]"
               >
-                <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#818CF8', flexShrink: 0 }}>
+                <div className="w-7 h-7 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shrink-0">
                   {f.icon}
                 </div>
-                <span style={{ color: 'rgba(241,245,249,0.65)' }}>{f.text}</span>
+                <span className="text-muted-foreground">{f.text}</span>
               </motion.div>
             ))}
           </div>
         </div>
 
         {/* Stats */}
-        <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: '0' }}>
+        <div className="relative z-10 flex items-center gap-0">
           {[
             { val: '10K+', label: 'Active Users' },
             { val: '50K+', label: 'Sessions' },
             { val: '99.9%', label: 'Uptime' },
           ].map((s, i) => (
-            <div key={i} style={{ paddingLeft: i > 0 ? '28px' : 0, marginLeft: i > 0 ? '28px' : 0, borderLeft: i > 0 ? '1px solid rgba(255,255,255,0.07)' : 'none' }}>
-              <div style={{ fontSize: '22px', fontWeight: 800, color: '#818CF8', letterSpacing: '-0.01em' }}>{s.val}</div>
-              <div style={{ fontSize: '12px', color: '#4B5563', marginTop: '2px' }}>{s.label}</div>
+            <div key={i} className={`pl-7 ml-7 ${i > 0 ? 'border-l border-border/50' : 'pl-0 ml-0 border-none'}`}>
+              <div className="text-[22px] font-extrabold text-primary tracking-[-0.01em]">{s.val}</div>
+              <div className="text-[12px] text-muted-foreground mt-0.5">{s.label}</div>
             </div>
           ))}
         </div>
       </div>
 
       {/* Right — Form Panel */}
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', position: 'relative' }}>
-        <div style={{ position: 'absolute', top: '30%', left: '50%', transform: 'translateX(-50%)', width: '400px', height: '400px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(99,102,241,0.04) 0%, transparent 70%)', pointerEvents: 'none' }} />
+      <div className="flex-1 flex items-center justify-center p-6 relative">
+        <div className="absolute top-6 right-6 z-50">
+          <ThemeToggle />
+        </div>
+        <div className="absolute top-[30%] left-1/2 -translate-x-1/2 w-[400px] h-[400px] rounded-full bg-[radial-gradient(circle,rgba(99,102,241,0.04)_0%,transparent_70%)] pointer-events-none" />
 
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45 }} style={{ width: '100%', maxWidth: '420px', position: 'relative' }}>
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45 }} className="w-full max-w-[420px] relative">
           {/* Mobile Logo */}
-          <Link to="/" className="lg:hidden" style={{ display: 'inline-flex', alignItems: 'center', gap: '9px', textDecoration: 'none', marginBottom: '28px' }}>
-            <div style={{ width: '32px', height: '32px', borderRadius: '9px', background: '#4F46E5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Link to="/" className="lg:hidden inline-flex items-center gap-2 mb-7 no-underline">
+            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
               <Code2 size={16} color="white" />
             </div>
-            <span style={{ fontSize: '17px', fontWeight: 700, color: '#f1f5f9' }}>Sync<span style={{ color: '#818CF8' }}>Code</span></span>
+            <span className="text-[17px] font-bold text-foreground">Sync<span className="text-primary">Code</span></span>
           </Link>
 
           {/* Card */}
-          <div style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '18px', padding: '32px' }}>
-            <h2 style={{ fontSize: '22px', fontWeight: 800, color: '#f1f5f9', letterSpacing: '-0.01em', marginBottom: '4px' }}>{title}</h2>
-            <p style={{ fontSize: '14px', color: '#6B7280', marginBottom: '28px' }}>{subtitle}</p>
+          <div className="bg-card border border-border/70 rounded-[18px] p-8 shadow-[var(--shadow-card)]">
+            <h2 className="text-[22px] font-extrabold text-foreground tracking-[-0.01em] mb-1">{title}</h2>
+            <p className="text-[14px] text-muted-foreground mb-7">{subtitle}</p>
             {children}
           </div>
         </motion.div>

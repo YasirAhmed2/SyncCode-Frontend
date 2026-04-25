@@ -4,12 +4,15 @@ import { useParams, useNavigate } from 'react-router-dom';
 import Editor from '@monaco-editor/react';
 import { useAuth } from '../context/auth.context';
 import { useRoom } from '../context/room.context';
+import { useTheme } from '../context/theme.context';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Play, Copy, Check, Users, MessageCircle, Code2, ChevronLeft, Send, Terminal, X, Loader2, Save, Wifi, WifiOff, Lock, Unlock } from 'lucide-react';
+import { Play, Copy, Check, Users, MessageCircle, Code2, ChevronLeft, Send, Terminal, X, Loader2, Save, Wifi, WifiOff, Lock, Unlock, History, FileBarChart2 } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { roomService } from '../lib/roomService';
 import { executionService } from '../lib/executionService';
+import SessionReplay from '../components/session/SessionReplay';
+import { ThemeToggle } from '../components/theme-toggle';
 
 interface Message { id: string; userId: string; userName: string; content: string; timestamp: string; }
 type ActivityStatus = 'active' | 'idle' | 'inactive';
@@ -29,6 +32,7 @@ export default function Room() {
   const { user } = useAuth();
   const { currentRoom, code, language, messages, updateCode, setLanguage, addMessage, setRoomMessages, joinRoom, leaveRoom } = useRoom();
   const { toast } = useToast();
+  const { theme } = useTheme();
 
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isOutputOpen, setIsOutputOpen] = useState(false);
@@ -49,6 +53,7 @@ export default function Room() {
   const [teacherId, setTeacherId] = useState<string | null>(currentRoom?.teacherId || null);
   const [selectedParticipantId, setSelectedParticipantId] = useState<string>('');
   const [activityMap, setActivityMap] = useState<Record<string, ActivitySnapshot>>({});
+  const [isReplayMode, setIsReplayMode] = useState(false);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const outputEndRef = useRef<HTMLDivElement>(null);
@@ -63,6 +68,8 @@ export default function Room() {
 
   const isTeacher = Boolean(user?.id && teacherId && user.id === teacherId);
   const isStudentReadOnly = !isTeacher && isEditorLocked;
+  // In replay mode nobody can type in the editor
+  const isEditorReadOnly = isStudentReadOnly || isReplayMode;
 
   const normalizeMessage = (raw: any): Message => ({
     id: raw?.id || `msg_${Date.now()}`,
@@ -215,8 +222,24 @@ export default function Room() {
         leaveRoom();
         navigate('/dashboard');
       });
+      socket.on('session-insights-ready', ({ roomId: r }: any) => {
+        if (r !== roomId) return;
+        toast({
+          title: '🎉 Session insights are ready',
+          description: 'Click to view the full report',
+          duration: 8000,
+          action: (
+            <button
+              onClick={() => navigate(`/rooms/${roomId}/report`)}
+              style={{ padding: '6px 14px', borderRadius: '8px', background: 'rgba(99,102,241,0.2)', color: '#818CF8', border: '1px solid rgba(99,102,241,0.35)', fontSize: '12px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}
+            >
+              View Report →
+            </button>
+          ),
+        } as any);
+      });
       return () => {
-        socket.off('code-update'); socket.off('cursor-update'); socket.off('language-update'); socket.off('participants-updated'); socket.off('activity-update'); socket.off('user-joined'); socket.off('user-left'); socket.off('room-control-state'); socket.off('room-lock-updated'); socket.off('room-chat-history'); socket.off('chat-message'); socket.off('participant-removed'); socket.off('removed-from-room');
+        socket.off('code-update'); socket.off('cursor-update'); socket.off('language-update'); socket.off('participants-updated'); socket.off('activity-update'); socket.off('user-joined'); socket.off('user-left'); socket.off('room-control-state'); socket.off('room-lock-updated'); socket.off('room-chat-history'); socket.off('chat-message'); socket.off('participant-removed'); socket.off('removed-from-room'); socket.off('session-insights-ready');
         if (emitCodeTimerRef.current !== null) {
           window.clearTimeout(emitCodeTimerRef.current);
           emitCodeTimerRef.current = null;
@@ -425,10 +448,10 @@ export default function Room() {
   };
 
   return (
-    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#0B0F19' }}>
+    <div className="h-screen flex flex-col bg-background">
 
       {/* ── HEADER ── */}
-      <header style={{ height: '52px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 14px', background: '#0D1117', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+      <header className="h-[52px] shrink-0 flex items-center justify-between px-[14px] bg-card border-b border-border/50">
 
         {/* Left */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -482,6 +505,11 @@ export default function Room() {
             </SelectContent>
           </Select>
 
+          {/* Theme Toggle */}
+          <div className="flex items-center justify-center">
+            <ThemeToggle />
+          </div>
+
           {isTeacher && (
             <>
               <button
@@ -513,6 +541,28 @@ export default function Room() {
               </button>
             </>
           )}
+
+          {/* Replay */}
+          <button
+            id="session-replay-btn"
+            onClick={() => { setIsReplayMode((r) => !r); setIsOutputOpen(false); }}
+            style={{ height: '32px', padding: '0 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', background: isReplayMode ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.04)', color: isReplayMode ? '#818CF8' : 'rgba(241,245,249,0.6)', border: `1px solid ${isReplayMode ? 'rgba(99,102,241,0.4)' : 'rgba(255,255,255,0.09)'}`, cursor: 'pointer', transition: 'all 0.15s' }}
+            className="hover:text-white hover:border-white/20 hover:bg-white/[0.07]"
+          >
+            <History size={13} />
+            <span className="hidden sm:inline">{isReplayMode ? 'Exit Replay' : 'Replay'}</span>
+          </button>
+
+          {/* Report (teacher sees full, students see own) */}
+          <button
+            id="session-report-btn"
+            onClick={() => navigate(`/rooms/${roomId}/report`)}
+            style={{ height: '32px', padding: '0 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.04)', color: 'rgba(241,245,249,0.6)', border: '1px solid rgba(255,255,255,0.09)', cursor: 'pointer', transition: 'all 0.15s' }}
+            className="hover:text-white hover:border-white/20 hover:bg-white/[0.07]"
+          >
+            <FileBarChart2 size={13} />
+            <span className="hidden sm:inline">Report</span>
+          </button>
 
           {/* Run */}
           <button onClick={handleExecute} disabled={isExecuting}
@@ -565,15 +615,12 @@ export default function Room() {
                 style={{
                   margin: '12px',
                   borderRadius: '18px',
-                  border: '1px solid rgba(255,255,255,0.08)',
-                  background: 'linear-gradient(180deg, rgba(15,23,42,0.96), rgba(2,6,23,0.96))',
-                  boxShadow: '0 18px 50px rgba(0,0,0,0.34)',
-                  backdropFilter: 'blur(18px)',
+                  boxShadow: '0 18px 50px rgba(0,0,0,0.1)',
                   overflow: 'hidden',
                 }}
-                className="xl:absolute xl:right-4 xl:top-4 xl:z-20 xl:m-0 xl:w-[330px]"
+                className="xl:absolute xl:right-4 xl:top-4 xl:z-20 xl:m-0 xl:w-[330px] bg-card/95 border border-border/80 backdrop-blur-md"
               >
-                <div style={{ padding: '14px 14px 12px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px' }}>
+                <div style={{ padding: '14px 14px 12px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px' }} className="border-b border-border/50">
                   <div>
                     <div style={{ fontSize: '13px', fontWeight: 700, color: '#f8fafc', letterSpacing: '-0.01em' }}>Live Classroom Intelligence</div>
                     <div style={{ fontSize: '11px', color: 'rgba(148,163,184,0.82)', marginTop: '3px' }}>Teacher-only engagement signal</div>
@@ -636,16 +683,38 @@ export default function Room() {
               value={code}
               onMount={handleEditorDidMount}
               onChange={(value) => {
-                if (isStudentReadOnly) return;
+                if (isEditorReadOnly) return;
                 if (value !== undefined && !isRemoteUpdate.current) {
                   updateCode(value);
                   queueCodeEmit(value);
                   emitTypingActivity();
                 }
               }}
-              theme="vs-dark"
-              options={{ readOnly: isStudentReadOnly, fontSize: 14, fontFamily: 'JetBrains Mono, monospace', fontLigatures: true, minimap: { enabled: false }, padding: { top: 18, bottom: 18 }, scrollBeyondLastLine: false, automaticLayout: true, tabSize: 2, wordWrap: 'on', lineNumbersMinChars: 3, renderLineHighlight: 'gutter', cursorBlinking: 'smooth', smoothScrolling: true }}
+              theme={theme === 'dark' ? 'vs-dark' : 'light'}
+              options={{ readOnly: isEditorReadOnly, fontSize: 14, fontFamily: 'JetBrains Mono, monospace', fontLigatures: true, minimap: { enabled: false }, padding: { top: 18, bottom: 18 }, scrollBeyondLastLine: false, automaticLayout: true, tabSize: 2, wordWrap: 'on', lineNumbersMinChars: 3, renderLineHighlight: 'gutter', cursorBlinking: 'smooth', smoothScrolling: true }}
             />
+
+            {/* ── SESSION REPLAY PANEL ── */}
+            <AnimatePresence>
+              {isReplayMode && roomId && user && (
+                <SessionReplay
+                  roomId={roomId}
+                  userId={user.id}
+                  isTeacher={isTeacher}
+                  onClose={() => setIsReplayMode(false)}
+                  onEditorUpdate={(replayCode) => {
+                    if (editorRef.current) {
+                      const model = editorRef.current.getModel();
+                      if (model) {
+                        isRemoteUpdate.current = true;
+                        editorRef.current.executeEdits('replay-sync', [{ range: model.getFullModelRange(), text: replayCode, forceMoveMarkers: true }]);
+                        isRemoteUpdate.current = false;
+                      }
+                    }
+                  }}
+                />
+              )}
+            </AnimatePresence>
           </div>
 
           {/* ── OUTPUT PANEL ── */}
@@ -656,10 +725,11 @@ export default function Room() {
                 animate={{ height: 'auto', opacity: 1 }}
                 exit={{ height: 0, opacity: 0 }}
                 transition={{ duration: 0.2, ease: 'easeOut' }}
-                style={{ flexShrink: 0, borderTop: '1px solid rgba(255,255,255,0.07)', display: 'flex', flexDirection: 'column', background: '#020617', minHeight: '140px', maxHeight: '320px' }}
+                style={{ minHeight: '140px', maxHeight: '320px' }}
+                className="shrink-0 border-t border-border/80 flex flex-col bg-background"
               >
                 {/* Panel header */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 14px', borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0, background: '#0D1117' }}>
+                <div className="flex items-center justify-between py-2 px-3.5 border-b border-border/50 shrink-0 bg-card">
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <Terminal size={13} color="#34D399" />
                     <span style={{ fontSize: '12px', fontWeight: 600, color: '#34D399', fontFamily: 'JetBrains Mono, monospace' }}>Output</span>
@@ -765,10 +835,10 @@ export default function Room() {
         <AnimatePresence>
           {isChatOpen && (
             <motion.aside initial={{ width: 0, opacity: 0 }} animate={{ width: 300, opacity: 1 }} exit={{ width: 0, opacity: 0 }} transition={{ duration: 0.22, ease: 'easeOut' }}
-              style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', borderLeft: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden', background: '#111827' }}
+              className="shrink-0 flex flex-col border-l border-border/80 overflow-hidden bg-card"
             >
               {/* Chat header */}
-              <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+              <div className="py-3 px-4 border-b border-border/50 flex items-center justify-between shrink-0">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <MessageCircle size={15} color="#818CF8" />
                   <span style={{ fontWeight: 600, color: '#f1f5f9', fontSize: '13px' }}>Team Chat</span>

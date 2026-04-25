@@ -31,7 +31,7 @@ function getGreeting() {
 
 function RoomCardSkeleton() {
   return (
-    <div style={{ padding: '20px', borderRadius: '14px', background: '#111827', border: '1px solid rgba(255,255,255,0.07)' }}>
+    <div className="p-5 rounded-[14px] bg-card border border-border/70">
       <div className="skeleton h-4 w-1/3 rounded-full mb-3" />
       <div className="skeleton h-3 w-2/3 rounded-full mb-4" />
       <div className="skeleton h-3 w-1/4 rounded-full" />
@@ -122,55 +122,47 @@ export default function Dashboard() {
     python: { bg: 'rgba(59,130,246,0.1)', text: '#60A5FA', label: 'PY' },
   };
 
-  const S = {
-    card: {
-      background: '#111827',
-      border: '1px solid rgba(255,255,255,0.07)',
-      borderRadius: '16px',
-    } as React.CSSProperties,
-  };
-
   return (
-    <div style={{ minHeight: '100vh', background: '#0B0F19' }}>
+    <div className="min-h-screen bg-background">
       <Navbar />
 
-      <main style={{ paddingTop: '96px', paddingBottom: '64px', padding: '96px 20px 64px' }}>
-        <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
+      <main className="pt-24 pb-16 px-5">
+        <div className="max-w-[1100px] mx-auto">
 
           {/* Welcome */}
-          <motion.div {...fadeUp(0)} style={{ marginBottom: '40px' }}>
-            <p style={{ fontSize: '12px', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#6366F1', marginBottom: '6px' }}>
+          <motion.div {...fadeUp(0)} className="mb-10">
+            <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-1.5">
               {getGreeting()}
             </p>
-            <h1 style={{ fontSize: 'clamp(1.75rem, 4vw, 2.5rem)', fontWeight: 800, color: '#f1f5f9', letterSpacing: '-0.02em', marginBottom: '8px' }}>
+            <h1 className="text-[clamp(1.75rem,4vw,2.5rem)] font-extrabold text-foreground tracking-tight mb-2">
               {user?.name || 'Developer'} 👋
             </h1>
-            <p style={{ fontSize: '15px', color: '#6B7280' }}>
+            <p className="text-[15px] text-muted-foreground">
               Create a new room or jump back into a recent session.
             </p>
           </motion.div>
 
           {/* Stats Row */}
-          <motion.div {...fadeUp(0.05)} style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px', marginBottom: '32px' }}>
+          <motion.div {...fadeUp(0.05)} className="grid grid-cols-3 gap-3.5 mb-8">
             {[
               { icon: <Code2 size={16} />, label: 'Total Rooms', val: rooms.length },
               { icon: <Users size={16} />, label: 'Collaborators', val: '—' },
               { icon: <Zap size={16} />, label: 'Sessions Today', val: '—' },
             ].map((s, i) => (
-              <div key={i} style={{ ...S.card, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '14px' }}>
-                <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: '#4F46E5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', flexShrink: 0 }}>
+              <div key={i} className="bg-card border border-border/70 rounded-2xl py-4 px-5 flex items-center gap-3.5 shadow-sm">
+                <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center text-white shrink-0">
                   {s.icon}
                 </div>
                 <div>
-                  <div style={{ fontSize: '20px', fontWeight: 700, color: '#f1f5f9', lineHeight: 1 }}>{s.val}</div>
-                  <div style={{ fontSize: '12px', color: '#6B7280', marginTop: '3px' }}>{s.label}</div>
+                  <div className="text-xl font-bold text-foreground leading-none">{s.val}</div>
+                  <div className="text-xs text-muted-foreground mt-1">{s.label}</div>
                 </div>
               </div>
             ))}
           </motion.div>
 
           {/* Action Cards */}
-          <motion.div {...fadeUp(0.1)} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', marginBottom: '48px' }}>
+          <motion.div {...fadeUp(0.1)} className="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-4 mb-12">
 
             {/* CREATE ROOM */}
             <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
@@ -178,66 +170,63 @@ export default function Dashboard() {
                 <motion.div
                   whileHover={{ y: -3 }}
                   transition={{ type: 'spring', stiffness: 300 }}
-                  style={{ ...S.card, padding: '28px', cursor: 'pointer', transition: 'border-color 0.2s, box-shadow 0.2s', position: 'relative', overflow: 'hidden' }}
-                  className="hover:border-indigo-500/30 hover:shadow-[0_8px_28px_rgba(0,0,0,0.4)]"
+                  className="bg-card border border-border/70 rounded-2xl p-7 cursor-pointer transition-all duration-200 relative overflow-hidden hover:border-primary/30 hover:shadow-[0_8px_28px_rgba(99,102,241,0.15)] group"
                 >
-                  <div style={{ position: 'absolute', top: 0, right: 0, width: '120px', height: '120px', background: 'radial-gradient(circle at top right, rgba(99,102,241,0.08), transparent 70%)', pointerEvents: 'none' }} />
-                  <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: '#4F46E5', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '18px', boxShadow: '0 4px 16px rgba(99,102,241,0.3)' }}>
+                  <div className="absolute top-0 right-0 w-[120px] h-[120px] bg-[radial-gradient(circle_at_top_right,rgba(99,102,241,0.08),transparent_70%)] pointer-events-none" />
+                  <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center mb-4 shadow-[0_4px_16px_rgba(99,102,241,0.3)]">
                     <Plus size={22} color="white" />
                   </div>
-                  <h3 style={{ fontSize: '17px', fontWeight: 700, color: '#f1f5f9', marginBottom: '8px' }}>Create New Room</h3>
-                  <p style={{ fontSize: '13px', color: '#6B7280', marginBottom: '20px', lineHeight: 1.65 }}>
+                  <h3 className="text-[17px] font-bold text-foreground mb-2">Create New Room</h3>
+                  <p className="text-[13px] text-muted-foreground mb-5 leading-relaxed">
                     Start a fresh coding session and invite your team with a shareable Room ID.
                   </p>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 600, color: '#818CF8' }}>
+                  <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-primary transition-transform group-hover:translate-x-1">
                     Create Room <ArrowRight size={14} />
                   </span>
                 </motion.div>
               </DialogTrigger>
 
-              <DialogContent style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.1)', maxWidth: '420px' }}>
+              <DialogContent className="bg-card border border-border/70 max-w-[420px] sm:rounded-[1.2rem]">
                 <DialogHeader>
-                  <DialogTitle style={{ fontSize: '18px', fontWeight: 700, color: '#f1f5f9' }}>Create New Room</DialogTitle>
-                  <DialogDescription style={{ color: '#6B7280' }}>Choose a programming language to get started.</DialogDescription>
+                  <DialogTitle className="text-lg font-bold text-foreground">Create New Room</DialogTitle>
+                  <DialogDescription className="text-muted-foreground">Choose a programming language to get started.</DialogDescription>
                 </DialogHeader>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '18px', paddingTop: '8px' }}>
+                <div className="flex flex-col gap-4 pt-2">
                   <div>
-                    <Label htmlFor="roomName" style={{ color: '#9CA3AF', fontSize: '13px' }}>Room Name</Label>
+                    <Label htmlFor="roomName" className="text-muted-foreground text-[13px]">Room Name</Label>
                     <Input
                       id="roomName"
                       placeholder="e.g. DSA Revision Batch"
                       value={roomName}
                       onChange={(e) => setRoomName(e.target.value)}
                       maxLength={80}
-                      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: '#f1f5f9', marginTop: '8px' }}
-                      className="placeholder:text-white/25 focus:border-indigo-500/50 focus:ring-0"
+                      className="bg-background border-border/70 text-foreground mt-2 placeholder:text-muted-foreground/50 focus:border-primary/50 focus:ring-1 focus:ring-primary/20"
                     />
                   </div>
                   <div>
-                    <label style={{ fontSize: '13px', fontWeight: 500, color: '#9CA3AF', display: 'block', marginBottom: '10px' }}>Select Language</label>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    <label className="text-[13px] font-medium text-muted-foreground block mb-2.5">Select Language</label>
+                    <div className="grid grid-cols-2 gap-2.5">
                       {(['javascript', 'python'] as const).map(lang => {
                         const c = langColors[lang];
                         const active = language === lang;
                         return (
                           <button key={lang} type="button" onClick={() => setLanguage(lang)}
-                            style={{
-                              padding: '14px', borderRadius: '12px', border: active ? `1.5px solid ${c.text}` : '1px solid rgba(255,255,255,0.1)',
-                              background: active ? c.bg : 'transparent', color: active ? c.text : 'rgba(255,255,255,0.4)',
-                              fontSize: '14px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', transition: 'all 0.15s',
-                            }}
+                            className={`p-3.5 rounded-xl border flex items-center gap-2.5 text-[14px] font-semibold transition-all duration-150 ${
+                              active ? 'border-primary/40 bg-primary/10' : 'border-border/50 bg-background/50 hover:bg-muted text-muted-foreground'
+                            }`}
+                            style={{ color: active ? c.text : undefined }}
                           >
-                            <span style={{ width: '30px', height: '30px', borderRadius: '8px', background: c.bg, color: c.text, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 800 }}>{c.label}</span>
-                            <span style={{ textTransform: 'capitalize' }}>{lang}</span>
+                            <span className="w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-extrabold" style={{ background: c.bg, color: c.text }}>{c.label}</span>
+                            <span className="capitalize">{lang}</span>
                           </button>
                         );
                       })}
                     </div>
                   </div>
                   <button onClick={handleCreateRoom} disabled={!language || !roomName.trim() || isLoading}
-                    style={{ width: '100%', padding: '13px', borderRadius: '12px', background: '#4F46E5', color: '#fff', fontWeight: 700, border: 'none', cursor: 'pointer', boxShadow: '0 4px 16px rgba(99,102,241,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', opacity: isLoading ? 0.7 : 1, transition: 'all 0.15s', fontSize: '14px' }}
+                    className="w-full p-3 rounded-xl bg-primary text-primary-foreground font-bold border-none cursor-pointer shadow-[0_4px_16px_rgba(99,102,241,0.3)] flex items-center justify-center gap-2 transition-all duration-150 text-[14px] disabled:opacity-70 disabled:cursor-not-allowed hover:bg-primary/90"
                   >
-                    {isLoading ? <><div className="spinner-sm" /> Creating…</> : <><Plus size={15} /> Create Room</>}
+                    {isLoading ? <><div className="spinner-sm border-white/20 border-t-white" /> Creating…</> : <><Plus size={15} /> Create Room</>}
                   </button>
                 </div>
               </DialogContent>
@@ -249,43 +238,41 @@ export default function Dashboard() {
                 <motion.div
                   whileHover={{ y: -3 }}
                   transition={{ type: 'spring', stiffness: 300 }}
-                  style={{ ...S.card, padding: '28px', cursor: 'pointer', transition: 'border-color 0.2s, box-shadow 0.2s', position: 'relative', overflow: 'hidden' }}
-                  className="hover:border-blue-500/30 hover:shadow-[0_8px_28px_rgba(0,0,0,0.4)]"
+                  className="bg-card border border-border/70 rounded-2xl p-7 cursor-pointer transition-all duration-200 relative overflow-hidden hover:border-blue-500/30 hover:shadow-[0_8px_28px_rgba(37,99,235,0.15)] group"
                 >
-                  <div style={{ position: 'absolute', top: 0, right: 0, width: '120px', height: '120px', background: 'radial-gradient(circle at top right, rgba(37,99,235,0.07), transparent 70%)', pointerEvents: 'none' }} />
-                  <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: 'rgba(37,99,235,0.15)', border: '1px solid rgba(37,99,235,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '18px' }}>
-                    <LogIn size={22} color="#60A5FA" />
+                  <div className="absolute top-0 right-0 w-[120px] h-[120px] bg-[radial-gradient(circle_at_top_right,rgba(37,99,235,0.07),transparent_70%)] pointer-events-none" />
+                  <div className="w-12 h-12 rounded-xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center mb-4">
+                    <LogIn size={22} className="text-blue-500 dark:text-blue-400" />
                   </div>
-                  <h3 style={{ fontSize: '17px', fontWeight: 700, color: '#f1f5f9', marginBottom: '8px' }}>Join a Room</h3>
-                  <p style={{ fontSize: '13px', color: '#6B7280', marginBottom: '20px', lineHeight: 1.65 }}>
+                  <h3 className="text-[17px] font-bold text-foreground mb-2">Join a Room</h3>
+                  <p className="text-[13px] text-muted-foreground mb-5 leading-relaxed">
                     Enter a Room ID shared by your teammate to join an existing live session.
                   </p>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 600, color: '#60A5FA' }}>
+                  <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-blue-500 dark:text-blue-400 transition-transform group-hover:translate-x-1">
                     Join Room <ArrowRight size={14} />
                   </span>
                 </motion.div>
               </DialogTrigger>
 
-              <DialogContent style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.1)', maxWidth: '420px' }}>
+              <DialogContent className="bg-card border border-border/70 max-w-[420px] sm:rounded-[1.2rem]">
                 <DialogHeader>
-                  <DialogTitle style={{ fontSize: '18px', fontWeight: 700, color: '#f1f5f9' }}>Join a Room</DialogTitle>
-                  <DialogDescription style={{ color: '#6B7280' }}>Paste the Room ID shared with you.</DialogDescription>
+                  <DialogTitle className="text-lg font-bold text-foreground">Join a Room</DialogTitle>
+                  <DialogDescription className="text-muted-foreground">Paste the Room ID shared with you.</DialogDescription>
                 </DialogHeader>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', paddingTop: '8px' }}>
+                <div className="flex flex-col gap-3.5 pt-2">
                   <div>
-                    <Label htmlFor="roomId" style={{ color: '#9CA3AF', fontSize: '13px' }}>Room ID</Label>
+                    <Label htmlFor="roomId" className="text-muted-foreground text-[13px]">Room ID</Label>
                     <Input
                       id="roomId" placeholder="room_xxxxxx" value={joinRoomId}
                       onChange={(e) => setJoinRoomId(e.target.value)}
-                      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: '#f1f5f9', fontFamily: 'JetBrains Mono, monospace', marginTop: '8px' }}
-                      className="placeholder:text-white/25 focus:border-blue-500/50 focus:ring-0"
+                      className="bg-background border-border/70 text-foreground font-mono mt-2 placeholder:text-muted-foreground/50 focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20"
                       onKeyDown={(e) => e.key === 'Enter' && handleJoinRoom()}
                     />
                   </div>
                   <button onClick={handleJoinRoom} disabled={!joinRoomId.trim() || isLoading}
-                    style={{ width: '100%', padding: '13px', borderRadius: '12px', background: '#2563EB', color: '#fff', fontWeight: 700, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', opacity: !joinRoomId.trim() || isLoading ? 0.5 : 1, transition: 'all 0.15s', fontSize: '14px' }}
+                    className="w-full p-3 rounded-xl bg-blue-600 text-white font-bold border-none cursor-pointer flex items-center justify-center gap-2 transition-all duration-150 text-[14px] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-700"
                   >
-                    {isLoading ? <><div className="spinner-sm" /> Joining…</> : <><LogIn size={15} /> Join Room</>}
+                    {isLoading ? <><div className="spinner-sm border-white/20 border-t-white" /> Joining…</> : <><LogIn size={15} /> Join Room</>}
                   </button>
                 </div>
               </DialogContent>
@@ -294,32 +281,32 @@ export default function Dashboard() {
 
           {/* Recent Rooms */}
           <motion.div {...fadeUp(0.2)}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-              <h2 style={{ fontSize: '17px', fontWeight: 700, color: '#f1f5f9' }}>Recent Rooms</h2>
-              <span style={{ fontSize: '13px', color: '#4B5563' }}>{rooms.length} room{rooms.length !== 1 ? 's' : ''}</span>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-[17px] font-bold text-foreground">Recent Rooms</h2>
+              <span className="text-[13px] text-muted-foreground">{rooms.length} room{rooms.length !== 1 ? 's' : ''}</span>
             </div>
 
             {loadingRooms ? (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '14px' }}>
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3.5">
                 {[1,2,3].map(i => <RoomCardSkeleton key={i} />)}
               </div>
             ) : rooms.length === 0 ? (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                style={{ textAlign: 'center', padding: '72px 24px', borderRadius: '16px', border: '1px dashed rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.01)' }}
+                className="text-center py-20 px-6 rounded-2xl border border-dashed border-border/70 bg-muted/10"
               >
-                <div style={{ width: '56px', height: '56px', borderRadius: '16px', background: '#4F46E5', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', boxShadow: '0 4px 20px rgba(99,102,241,0.3)' }}>
+                <div className="w-14 h-14 rounded-2xl bg-primary flex items-center justify-center mx-auto mb-4 shadow-[0_4px_20px_rgba(99,102,241,0.3)]">
                   <Terminal size={26} color="white" />
                 </div>
-                <h3 style={{ fontSize: '17px', fontWeight: 700, color: 'rgba(241,245,249,0.6)', marginBottom: '8px' }}>No rooms yet</h3>
-                <p style={{ fontSize: '14px', color: '#4B5563', marginBottom: '28px' }}>Create your first room to start collaborating</p>
+                <h3 className="text-[17px] font-bold text-foreground/80 mb-2">No rooms yet</h3>
+                <p className="text-[14px] text-muted-foreground mb-7">Create your first room to start collaborating</p>
                 <button onClick={() => setIsCreateDialogOpen(true)}
-                  style={{ padding: '11px 24px', borderRadius: '12px', background: '#4F46E5', color: '#fff', fontWeight: 600, border: 'none', cursor: 'pointer', boxShadow: '0 4px 16px rgba(99,102,241,0.3)', display: 'inline-flex', alignItems: 'center', gap: '8px', fontSize: '14px' }}
+                  className="px-6 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold border-none cursor-pointer shadow-[0_4px_16px_rgba(99,102,241,0.3)] inline-flex items-center gap-2 text-[14px] hover:bg-primary/90 transition-colors"
                 >
                   <Plus size={15} /> Create First Room
                 </button>
               </motion.div>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '14px' }}>
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3.5">
                 {rooms.map((room: any, i: number) => {
                   const id = room.roomId || room.id;
                   const lang = room.language || 'code';
@@ -329,31 +316,30 @@ export default function Dashboard() {
                     <motion.div key={id}
                       initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}
                       whileHover={{ y: -3 }} onClick={() => navigate(`/rooms/${id}`)}
-                      style={{ ...S.card, padding: '20px', cursor: 'pointer', transition: 'border-color 0.2s, box-shadow 0.2s' }}
-                      className="group hover:border-indigo-500/30 hover:shadow-[0_8px_24px_rgba(0,0,0,0.4)]"
+                      className="bg-card border border-border/70 p-5 rounded-2xl cursor-pointer transition-all duration-200 group hover:border-primary/30 hover:shadow-[0_8px_24px_rgba(0,0,0,0.1)] dark:hover:shadow-[0_8px_24px_rgba(0,0,0,0.4)]"
                     >
-                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '14px' }}>
-                        <div style={{ padding: '4px 10px', borderRadius: '7px', fontSize: '11px', fontWeight: 700, letterSpacing: '0.04em', background: lc.bg, color: lc.text }}>
+                      <div className="flex items-start justify-between mb-3.5">
+                        <div className="px-2.5 py-1 rounded-md text-[11px] font-bold tracking-[0.04em]" style={{ background: lc.bg, color: lc.text }}>
                           {lang.toUpperCase()}
                         </div>
                         <button onClick={(e) => { e.stopPropagation(); handleCopyId(id); }}
-                          style={{ padding: '6px', borderRadius: '7px', color: 'rgba(255,255,255,0.3)', background: 'transparent', border: 'none', cursor: 'pointer', transition: 'all 0.15s' }}
-                          className="hover:text-white/70 hover:bg-white/5" title="Copy Room ID"
+                          className="p-1.5 rounded-md text-muted-foreground bg-transparent border-none cursor-pointer transition-all duration-150 hover:text-foreground hover:bg-muted" 
+                          title="Copy Room ID"
                         >
-                          {copiedId === id ? <Check size={14} color="#34D399" /> : <Copy size={14} />}
+                          {copiedId === id ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
                         </button>
                       </div>
-                      <p style={{ fontSize: '14px', fontWeight: 700, color: '#e2e8f0', marginBottom: '8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <p className="text-[14px] font-bold text-foreground mb-2 overflow-hidden text-ellipsis whitespace-nowrap">
                         {room.name || 'Untitled Room'}
                       </p>
-                      <p style={{ fontSize: '11px', fontFamily: 'JetBrains Mono, monospace', color: 'rgba(255,255,255,0.25)', marginBottom: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{id}</p>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', color: '#4B5563' }}>
+                      <p className="text-[11px] font-mono text-muted-foreground/70 mb-3 overflow-hidden text-ellipsis whitespace-nowrap">{id}</p>
+                      <div className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
                         <Clock size={12} />
                         <span>{date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                       </div>
-                      <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: '12px', color: '#4B5563' }}>Click to rejoin</span>
-                        <ArrowRight size={14} color="#4B5563" className="group-hover:text-indigo-400 group-hover:translate-x-0.5 transition-all duration-200" />
+                      <div className="mt-4 pt-4 border-t border-border/50 flex items-center justify-between">
+                        <span className="text-[12px] text-muted-foreground">Click to rejoin</span>
+                        <ArrowRight size={14} className="text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all duration-200" />
                       </div>
                     </motion.div>
                   );
