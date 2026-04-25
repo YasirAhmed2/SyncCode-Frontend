@@ -6,12 +6,11 @@ import { useAuth } from '../context/auth.context';
 import { useRoom } from '../context/room.context';
 import { useTheme } from '../context/theme.context';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Play, Copy, Check, Users, MessageCircle, Code2, ChevronLeft, Send, Terminal, X, Loader2, Save, Wifi, WifiOff, Lock, Unlock, History, FileBarChart2 } from 'lucide-react';
+import { Play, Copy, Check, Users, MessageCircle, Code2, ChevronLeft, Send, Terminal, X, Loader2, Save, Wifi, WifiOff, Lock, Unlock, FileBarChart2 } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { roomService } from '../lib/roomService';
 import { executionService } from '../lib/executionService';
-import SessionReplay from '../components/session/SessionReplay';
 import { ThemeToggle } from '../components/theme-toggle';
 
 interface Message { id: string; userId: string; userName: string; content: string; timestamp: string; }
@@ -53,8 +52,8 @@ export default function Room() {
   const [teacherId, setTeacherId] = useState<string | null>(currentRoom?.teacherId || null);
   const [selectedParticipantId, setSelectedParticipantId] = useState<string>('');
   const [activityMap, setActivityMap] = useState<Record<string, ActivitySnapshot>>({});
-  const [isReplayMode, setIsReplayMode] = useState(false);
   const [cursorPositions, setCursorPositions] = useState<Record<string, { lineNumber: number; column: number; name: string }>>({}); // track where each participant's cursor is
+  const [typingUsers, setTypingUsers] = useState<Record<string, { name: string }>>({});
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const outputEndRef = useRef<HTMLDivElement>(null);
@@ -66,11 +65,11 @@ export default function Room() {
   const pendingEmitCodeRef = useRef<string | null>(null);
   const emitCodeTimerRef = useRef<number | null>(null);
   const typingStopTimerRef = useRef<number | null>(null);
+  const typingResetTimersRef = useRef<Record<string, number>>({});
 
   const isTeacher = Boolean(user?.id && teacherId && user.id === teacherId);
   const isStudentReadOnly = !isTeacher && isEditorLocked;
-  // In replay mode nobody can type in the editor
-  const isEditorReadOnly = isStudentReadOnly || isReplayMode;
+  const isEditorReadOnly = isStudentReadOnly;
 
   const normalizeMessage = (raw: any): Message => ({
     id: raw?.id || `msg_${Date.now()}`,
@@ -131,12 +130,46 @@ export default function Room() {
     cursorDecorations.current.set(remoteCursor.userId, newIds);
   };
 
+  const markUserTyping = (typingUserId: string, typingUserName: string) => {
+    if (!typingUserId) return;
+
+    setTypingUsers((prev) => ({
+      ...prev,
+      [typingUserId]: { name: typingUserName || prev[typingUserId]?.name || 'Unknown' },
+    }));
+
+    const existingTimer = typingResetTimersRef.current[typingUserId];
+    if (existingTimer !== undefined) {
+      window.clearTimeout(existingTimer);
+    }
+
+    typingResetTimersRef.current[typingUserId] = window.setTimeout(() => {
+      setTypingUsers((prev) => {
+        if (!prev[typingUserId]) return prev;
+        const next = { ...prev };
+        delete next[typingUserId];
+        return next;
+      });
+      delete typingResetTimersRef.current[typingUserId];
+    }, 2500);
+  };
+
   const handleEditorDidMount = (editor: any, monaco: any) => {
     editorRef.current = editor;
     monacoRef.current = monaco;
     // Emit cursor position when it changes so other participants can see your line
     editor.onDidChangeCursorPosition((e: any) => {
       if (!roomId || !user?.id || !user?.name || isRemoteUpdate.current) return;
+
+      setCursorPositions((prev) => ({
+        ...prev,
+        [user.id]: {
+          lineNumber: e.position.lineNumber,
+          column: e.position.column,
+          name: user.name,
+        },
+      }));
+
       socket.emit('cursor-change', {
         roomId,
         cursorData: {
@@ -174,6 +207,9 @@ export default function Room() {
       socket.emit('join-room', { roomId, userId: user.id, userName: user.name, avatarColor: user.avatarColor || '#4F46E5' });
       socket.on('code-update', (updateData: any) => {
         const newCode = typeof updateData === 'string' ? updateData : updateData.code;
+        if (updateData?.changedBy?.userId) {
+          markUserTyping(updateData.changedBy.userId, updateData.changedBy.userName || 'Unknown');
+        }
         if (editorRef.current && newCode !== editorRef.current.getValue()) {
           const model = editorRef.current.getModel();
           if (model) { isRemoteUpdate.current = true; editorRef.current.executeEdits('remote-sync', [{ range: model.getFullModelRange(), text: newCode, forceMoveMarkers: true }]); updateCode(newCode); isRemoteUpdate.current = false; }
@@ -193,7 +229,33 @@ export default function Room() {
           }));
         }
       });
-      socket.on('participants-updated', ({ participants }: any) => setActiveParticipants(participants));
+      socket.on('participants-updated', ({ participants }: any) => {
+        setActiveParticipants(participants);
+
+        const participantIds = new Set((participants || []).map((participant: any) => participant.id));
+        setCursorPositions((prev) => {
+          const next: Record<string, { lineNumber: number; column: number; name: string }> = {};
+          Object.entries(prev).forEach(([participantId, value]) => {
+            if (participantIds.has(participantId)) {
+              next[participantId] = value;
+            }
+          });
+          return next;
+        });
+
+        setTypingUsers((prev) => {
+          const next: Record<string, { name: string }> = {};
+          Object.entries(prev).forEach(([participantId, value]) => {
+            if (participantIds.has(participantId)) {
+              next[participantId] = value;
+            } else if (typingResetTimersRef.current[participantId] !== undefined) {
+              window.clearTimeout(typingResetTimersRef.current[participantId]);
+              delete typingResetTimersRef.current[participantId];
+            }
+          });
+          return next;
+        });
+      });
       socket.on('activity-update', (payload: any) => {
         if (payload?.roomId !== roomId) return;
 
@@ -275,6 +337,10 @@ export default function Room() {
           window.clearTimeout(typingStopTimerRef.current);
           typingStopTimerRef.current = null;
         }
+        Object.values(typingResetTimersRef.current).forEach((timerId) => {
+          window.clearTimeout(timerId);
+        });
+        typingResetTimersRef.current = {};
         pendingEmitCodeRef.current = null;
         socket.emit('leave-room', { roomId, userId: user.id }); socket.disconnect(); setIsConnected(false);
       };
@@ -292,17 +358,27 @@ export default function Room() {
   }, [currentRoom]);
 
   useEffect(() => {
-    if (roomId && !currentRoom && !isJoiningRoom.current) {
-      isJoiningRoom.current = true;
-      joinRoom(roomId).finally(() => { isJoiningRoom.current = false; });
-    }
-  }, [roomId]); // intentionally narrow deps — prevents re-mount during execution
+    if (!roomId || isJoiningRoom.current) return;
+
+    // Always load data for the active route room to avoid sharing stale code state
+    // from a previously opened room.
+    if (currentRoom?.id === roomId) return;
+
+    isJoiningRoom.current = true;
+    joinRoom(roomId).finally(() => { isJoiningRoom.current = false; });
+  }, [roomId, currentRoom?.id]);
   useEffect(() => {
     setActivityMap({});
+    setCursorPositions({});
+    setTypingUsers({});
     if (typingStopTimerRef.current !== null) {
       window.clearTimeout(typingStopTimerRef.current);
       typingStopTimerRef.current = null;
     }
+    Object.values(typingResetTimersRef.current).forEach((timerId) => {
+      window.clearTimeout(timerId);
+    });
+    typingResetTimersRef.current = {};
   }, [roomId]);
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
   useEffect(() => { outputEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [terminalEntries, isExecuting]);
@@ -421,7 +497,16 @@ export default function Room() {
       setIsExecuting(false);
     }
   };
-  const handleSaveCode = async () => { try { if (!roomId) return; await roomService.saveCode({ roomId, code, language }); toast({ title: 'Code saved successfully' }); } catch { toast({ title: 'Failed to save code', variant: 'destructive' }); } };
+  const handleSaveCode = async () => {
+    try {
+      if (!roomId) return;
+      const liveCode = editorRef.current ? editorRef.current.getValue() : code;
+      await roomService.saveCode({ roomId, code: liveCode, language });
+      toast({ title: 'Code saved successfully' });
+    } catch {
+      toast({ title: 'Failed to save code', variant: 'destructive' });
+    }
+  };
   const handleSendMessage = () => {
     const content = newMessage.trim();
     if (!content || !roomId || !user?.id || !user?.name) return;
@@ -448,6 +533,21 @@ export default function Room() {
   };
 
   const participants = activeParticipants && activeParticipants.length > 0 ? activeParticipants : [{ id: user?.id || '1', name: user?.name || 'You', avatarColor: user?.avatarColor || '#4F46E5', isOnline: true }];
+  const participantNameById = participants.reduce<Record<string, string>>((acc, participant) => {
+    acc[participant.id] = participant.name;
+    return acc;
+  }, {});
+  const typingIndicators = Object.entries(typingUsers)
+    .map(([typingUserId, payload]) => {
+      const cursor = cursorPositions[typingUserId];
+      return {
+        id: typingUserId,
+        name: payload.name || participantNameById[typingUserId] || 'Unknown',
+        lineNumber: cursor?.lineNumber,
+        column: cursor?.column,
+      };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
   const classroomParticipants = participants.filter((participant) => participant.id !== teacherId);
   const removableParticipants = participants.filter((p) => p.id !== teacherId);
   const allMessages = messages
@@ -568,20 +668,6 @@ export default function Room() {
             </>
           )}
 
-          {/* Replay */}
-          <button
-            id="session-replay-btn"
-            onClick={() => { setIsReplayMode((r) => !r); setIsOutputOpen(false); }}
-            className={`h-8 px-3 rounded-lg text-[12px] font-semibold flex items-center gap-1.5 border cursor-pointer transition-all duration-150 ${
-              isReplayMode
-                ? 'bg-primary/15 text-primary border-primary/35 hover:bg-primary/20'
-                : 'bg-muted/50 text-muted-foreground border-border hover:bg-muted hover:text-foreground'
-            }`}
-          >
-            <History size={13} />
-            <span className="hidden sm:inline">{isReplayMode ? 'Exit Replay' : 'Replay'}</span>
-          </button>
-
           {/* Report (teacher sees full, students see own) */}
           <button
             id="session-report-btn"
@@ -630,6 +716,25 @@ export default function Room() {
           </button>
         </div>
       </header>
+
+      {typingIndicators.length > 0 && (
+        <div className="shrink-0 border-b border-border/50 bg-card px-[14px] py-1.5">
+          <div className="flex items-center gap-2 overflow-x-auto">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground whitespace-nowrap">Typing Now</span>
+            {typingIndicators.map((indicator) => (
+              <div
+                key={indicator.id}
+                className="px-2 py-1 rounded-md border border-primary/25 bg-primary/10 text-primary text-[11px] whitespace-nowrap"
+              >
+                {indicator.name}{' '}
+                {indicator.lineNumber && indicator.column
+                  ? `• Ln ${indicator.lineNumber}, Col ${indicator.column}`
+                  : '• Cursor moving'}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── MAIN ── */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
@@ -726,6 +831,9 @@ export default function Room() {
                 if (isEditorReadOnly) return;
                 if (value !== undefined && !isRemoteUpdate.current) {
                   updateCode(value);
+                  if (user?.id && user?.name) {
+                    markUserTyping(user.id, user.name);
+                  }
                   queueCodeEmit(value);
                   emitTypingActivity();
                 }
@@ -733,28 +841,6 @@ export default function Room() {
               theme={isDarkMode ? 'vs-dark' : 'light'}
               options={{ readOnly: isEditorReadOnly, fontSize: 14, fontFamily: 'JetBrains Mono, monospace', fontLigatures: true, minimap: { enabled: false }, padding: { top: 18, bottom: 18 }, scrollBeyondLastLine: false, automaticLayout: true, tabSize: 2, wordWrap: 'on', lineNumbersMinChars: 3, renderLineHighlight: 'gutter', cursorBlinking: 'smooth', smoothScrolling: true }}
             />
-
-            {/* ── SESSION REPLAY PANEL ── */}
-            <AnimatePresence>
-              {isReplayMode && roomId && user && (
-                <SessionReplay
-                  roomId={roomId}
-                  userId={user.id}
-                  isTeacher={isTeacher}
-                  onClose={() => setIsReplayMode(false)}
-                  onEditorUpdate={(replayCode) => {
-                    if (editorRef.current) {
-                      const model = editorRef.current.getModel();
-                      if (model) {
-                        isRemoteUpdate.current = true;
-                        editorRef.current.executeEdits('replay-sync', [{ range: model.getFullModelRange(), text: replayCode, forceMoveMarkers: true }]);
-                        isRemoteUpdate.current = false;
-                      }
-                    }
-                  }}
-                />
-              )}
-            </AnimatePresence>
           </div>
 
           {/* ── OUTPUT PANEL ── */}

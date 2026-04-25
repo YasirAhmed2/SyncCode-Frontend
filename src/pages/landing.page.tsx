@@ -42,8 +42,8 @@ const problemItems = [
   },
   {
     icon: Video,
-    title: 'No session replay or review',
-    description: 'Classes end with zero structured insights or learning traces.',
+    title: 'No structured post-class review',
+    description: 'Classes end with no clear analytics on what happened during learning.',
   },
   {
     icon: BarChart3,
@@ -63,7 +63,7 @@ const solutionPairs = [
   },
   {
     problem: 'No visibility after the session ends.',
-    solution: 'Session recordings and reports make every class reviewable and coachable.',
+    solution: 'Session reports make every class measurable and coachable.',
   },
 ] as const;
 
@@ -86,8 +86,8 @@ const featureBlocks = [
     id: 'session-intelligence',
     eyebrow: 'Feature 03',
     title: 'Session Intelligence',
-    description: 'Replay teaching sessions, review insights, and track learning progress.',
-    bullets: ['Replay and review sessions', 'Auto-generated class insights', 'Progress tracking over time'],
+    description: 'Review class insights and track learning progress over time.',
+    bullets: ['Session-level class insights', 'Auto-generated engagement summaries', 'Progress tracking over time'],
   },
 ] as const;
 
@@ -337,7 +337,7 @@ function LandingPage() {
                 {[
                   ['Teacher Controlled', 'Broadcast, practice, lock editing'],
                   ['Live Attention Tracker', 'See active, idle, inactive learners'],
-                  ['Session Intelligence', 'Replay sessions and review reports'],
+                  ['Session Intelligence', 'Review reports and class insights'],
                 ].map(([label, value]) => (
                   <div key={label} className="rounded-2xl border border-border/70 bg-card/60 p-4 shadow-[var(--shadow-card)]">
                     <div className="text-sm font-semibold text-foreground">{label}</div>
@@ -461,7 +461,7 @@ function LandingPage() {
                       </div>
                       <div className="mt-3 flex gap-1.5">
                         {[
-                          ['Replay', '45m'],
+                          ['Duration', '45m'],
                           ['Focus', '4'],
                           ['Gaps', '3'],
                         ].map(([label, value]) => (
@@ -688,7 +688,7 @@ function LandingPage() {
           </div>
           <div className="flex items-center gap-4">
             <a
-              href="https://github.com/YasirAhmed2/SyncCode-Frontend"
+              href="https://github.com/YasirAhmed2"
               target="_blank"
               rel="noreferrer"
               className="flex items-center gap-2 rounded-xl border border-border/70 bg-card/70 px-4 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
@@ -697,7 +697,7 @@ function LandingPage() {
               GitHub
             </a>
             <a
-              href="https://www.linkedin.com/"
+              href="https://www.linkedin.com/in/iamyasirahmed/"
               target="_blank"
               rel="noreferrer"
               className="flex items-center gap-2 rounded-xl border border-border/70 bg-card/70 px-4 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
@@ -792,7 +792,7 @@ function FeatureMock({ featureId }: { featureId: string }) {
     <motion.div whileHover={{ y: -3 }} className="rounded-[28px] border border-border/70 bg-background/70 p-5">
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-sm font-semibold">Session Replay & Reports</div>
+          <div className="text-sm font-semibold">Session Reports</div>
           <div className="mt-1 text-xs text-muted-foreground">Review the class after it ends</div>
         </div>
         <LineChart className="h-5 w-5 text-primary" />
@@ -801,7 +801,7 @@ function FeatureMock({ featureId }: { featureId: string }) {
       <div className="mt-6 rounded-3xl border border-border/70 bg-card/70 p-4">
         <div className="flex items-center justify-between text-sm">
           <span className="font-semibold">Session Timeline</span>
-          <span className="text-muted-foreground">Replay ready</span>
+          <span className="text-muted-foreground">Report ready</span>
         </div>
 
         <div className="mt-5 space-y-4">
