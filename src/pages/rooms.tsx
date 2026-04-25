@@ -12,6 +12,13 @@ import { roomService } from '../lib/roomService';
 import { executionService } from '../lib/executionService';
 
 interface Message { id: string; userId: string; userName: string; content: string; timestamp: string; }
+type ActivityStatus = 'active' | 'idle' | 'inactive';
+
+interface ActivitySnapshot {
+  status: ActivityStatus;
+  lastActive: number;
+}
+
 type TerminalLevel = 'info' | 'stdout' | 'stderr' | 'error' | 'system';
 interface TerminalEntry { id: string; level: TerminalLevel; message: string; timestamp: string; }
 interface NormalizedExecutionResult { stdout: string; stderr: string; exitCode: number | null; }
@@ -41,6 +48,7 @@ export default function Room() {
   const [isEditorLocked, setIsEditorLocked] = useState<boolean>(Boolean(currentRoom?.isLocked));
   const [teacherId, setTeacherId] = useState<string | null>(currentRoom?.teacherId || null);
   const [selectedParticipantId, setSelectedParticipantId] = useState<string>('');
+  const [activityMap, setActivityMap] = useState<Record<string, ActivitySnapshot>>({});
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const outputEndRef = useRef<HTMLDivElement>(null);
@@ -51,6 +59,7 @@ export default function Room() {
   const isJoiningRoom = useRef(false); // guard against re-entrant joinRoom calls
   const pendingEmitCodeRef = useRef<string | null>(null);
   const emitCodeTimerRef = useRef<number | null>(null);
+  const typingStopTimerRef = useRef<number | null>(null);
 
   const isTeacher = Boolean(user?.id && teacherId && user.id === teacherId);
   const isStudentReadOnly = !isTeacher && isEditorLocked;
@@ -62,6 +71,41 @@ export default function Room() {
     content: raw?.content || '',
     timestamp: raw?.timestamp ? new Date(raw.timestamp).toISOString() : new Date().toISOString(),
   });
+
+  const emitUserActivity = () => {
+    if (!roomId || !user?.id) return;
+    // Suppress activity emission for teachers and when practice is disabled
+    if (isTeacher || isEditorLocked) return;
+    socket.emit('user-activity', { roomId, userId: user.id, source: "local" });
+  };
+
+  const emitTypingActivity = () => {
+    if (!roomId || !user?.id) return;
+
+    // Skip activity for teachers or when practice is disabled
+    if (isTeacher || isEditorLocked) return;
+    socket.emit('user-typing', { roomId, userId: user.id, source: "local" });
+    socket.emit('user-activity', { roomId, userId: user.id, source: "local" });
+    if (typingStopTimerRef.current !== null) {
+      window.clearTimeout(typingStopTimerRef.current);
+    }
+    typingStopTimerRef.current = window.setTimeout(() => {
+      socket.emit('user-stop-typing', { roomId, userId: user.id, source: "local" });
+      typingStopTimerRef.current = null;
+    }, 1500);
+  };
+
+  const formatLastActive = (lastActive: number) => {
+    if (!lastActive) return 'No recent activity';
+
+    const seconds = Math.max(0, Math.round((Date.now() - lastActive) / 1000));
+    if (seconds < 60) {
+      return `${seconds}s ago`;
+    }
+
+    const minutes = Math.floor(seconds / 60);
+    return `${minutes}m ago`;
+  };
 
   const handleRemoteCursorUpdate = (remoteCursor: any) => {
     if (!editorRef.current || !monacoRef.current) return;
@@ -82,10 +126,7 @@ export default function Room() {
   const handleEditorDidMount = (editor: any, monaco: any) => {
     editorRef.current = editor;
     monacoRef.current = monaco;
-    editor.onDidChangeCursorPosition((e: any) => {
-      if (!user) return;
-      socket.emit('cursor-change', { roomId, cursorData: { userId: user.id || 'guest', name: user.name || 'Guest', color: user.avatarColor || '#4F46E5', lineNumber: e.position.lineNumber, column: e.position.column } });
-    });
+    // No activity emissions on focus, mouse, key, or cursor movements to avoid false positives.
   };
 
   const queueCodeEmit = (nextCode: string) => {
@@ -100,7 +141,7 @@ export default function Room() {
       emitCodeTimerRef.current = null;
 
       if (!latestCode) return;
-      socket.emit('code-change', { roomId, code: latestCode, language, userId: user?.id, userName: user?.name });
+      socket.emit('code-change', { roomId, code: latestCode, language, userId: user?.id, userName: user?.name, source: "local" });
     }, 35);
   };
 
@@ -119,6 +160,22 @@ export default function Room() {
       });
       socket.on('cursor-update', (cursorData: any) => { if (cursorData.userId !== user.id) handleRemoteCursorUpdate(cursorData); });
       socket.on('participants-updated', ({ participants }: any) => setActiveParticipants(participants));
+      socket.on('activity-update', (payload: any) => {
+        if (payload?.roomId !== roomId) return;
+
+        const nextActivity: Record<string, ActivitySnapshot> = {};
+        const users = Array.isArray(payload?.users) ? payload.users : [];
+
+        users.forEach((entry: any) => {
+          if (!entry?.userId) return;
+          nextActivity[entry.userId] = {
+            status: entry.status === 'active' || entry.status === 'idle' || entry.status === 'inactive' ? entry.status : 'inactive',
+            lastActive: typeof entry.lastActive === 'number' ? entry.lastActive : Date.now(),
+          };
+        });
+
+        setActivityMap(nextActivity);
+      });
       socket.on('user-joined', (joinData: any) => { toast({ title: `${joinData.userName} joined the room`, duration: 2000 }); });
       socket.on('user-left', () => undefined);
       socket.on('language-update', (updateData: any) => { const newLang = typeof updateData === 'string' ? updateData : updateData.language; setLanguage(newLang); if (updateData.changedBy) toast({ title: `${updateData.changedBy.userName} changed language to ${newLang}`, duration: 2000 }); });
@@ -159,10 +216,14 @@ export default function Room() {
         navigate('/dashboard');
       });
       return () => {
-        socket.off('code-update'); socket.off('cursor-update'); socket.off('language-update'); socket.off('participants-updated'); socket.off('user-joined'); socket.off('user-left'); socket.off('room-control-state'); socket.off('room-lock-updated'); socket.off('room-chat-history'); socket.off('chat-message'); socket.off('participant-removed'); socket.off('removed-from-room');
+        socket.off('code-update'); socket.off('cursor-update'); socket.off('language-update'); socket.off('participants-updated'); socket.off('activity-update'); socket.off('user-joined'); socket.off('user-left'); socket.off('room-control-state'); socket.off('room-lock-updated'); socket.off('room-chat-history'); socket.off('chat-message'); socket.off('participant-removed'); socket.off('removed-from-room');
         if (emitCodeTimerRef.current !== null) {
           window.clearTimeout(emitCodeTimerRef.current);
           emitCodeTimerRef.current = null;
+        }
+        if (typingStopTimerRef.current !== null) {
+          window.clearTimeout(typingStopTimerRef.current);
+          typingStopTimerRef.current = null;
         }
         pendingEmitCodeRef.current = null;
         socket.emit('leave-room', { roomId, userId: user.id }); socket.disconnect(); setIsConnected(false);
@@ -186,6 +247,13 @@ export default function Room() {
       joinRoom(roomId).finally(() => { isJoiningRoom.current = false; });
     }
   }, [roomId]); // intentionally narrow deps — prevents re-mount during execution
+  useEffect(() => {
+    setActivityMap({});
+    if (typingStopTimerRef.current !== null) {
+      window.clearTimeout(typingStopTimerRef.current);
+      typingStopTimerRef.current = null;
+    }
+  }, [roomId]);
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
   useEffect(() => { outputEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [terminalEntries, isExecuting]);
 
@@ -330,10 +398,31 @@ export default function Room() {
   };
 
   const participants = activeParticipants && activeParticipants.length > 0 ? activeParticipants : [{ id: user?.id || '1', name: user?.name || 'You', avatarColor: user?.avatarColor || '#4F46E5', isOnline: true }];
+  const classroomParticipants = participants.filter((participant) => participant.id !== teacherId);
   const removableParticipants = participants.filter((p) => p.id !== teacherId);
   const allMessages = messages
     .slice()
     .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+  const activityPalette: Record<ActivityStatus, { dot: string; glow: string; label: string; badge: string }> = {
+    active: {
+      dot: '#34D399',
+      glow: 'shadow-[0_0_18px_rgba(52,211,153,0.35)]',
+      label: 'Active',
+      badge: 'rgba(16,185,129,0.12)',
+    },
+    idle: {
+      dot: '#FBBF24',
+      glow: 'shadow-[0_0_14px_rgba(251,191,36,0.22)] animate-pulse',
+      label: 'Idle',
+      badge: 'rgba(251,191,36,0.12)',
+    },
+    inactive: {
+      dot: '#FB7185',
+      glow: 'shadow-[0_0_10px_rgba(251,113,133,0.12)] opacity-80',
+      label: 'Inactive',
+      badge: 'rgba(251,113,133,0.12)',
+    },
+  };
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#0B0F19' }}>
@@ -466,7 +555,81 @@ export default function Room() {
 
         {/* Editor column */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          <div style={{ flex: 1, position: 'relative' }}>
+          <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }} className={isTeacher ? 'xl:pr-[352px]' : ''}>
+            {isTeacher && (
+              <motion.aside
+                initial={{ opacity: 0, y: 10, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 10, scale: 0.98 }}
+                transition={{ duration: 0.2, ease: 'easeOut' }}
+                style={{
+                  margin: '12px',
+                  borderRadius: '18px',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  background: 'linear-gradient(180deg, rgba(15,23,42,0.96), rgba(2,6,23,0.96))',
+                  boxShadow: '0 18px 50px rgba(0,0,0,0.34)',
+                  backdropFilter: 'blur(18px)',
+                  overflow: 'hidden',
+                }}
+                className="xl:absolute xl:right-4 xl:top-4 xl:z-20 xl:m-0 xl:w-[330px]"
+              >
+                <div style={{ padding: '14px 14px 12px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px' }}>
+                  <div>
+                    <div style={{ fontSize: '13px', fontWeight: 700, color: '#f8fafc', letterSpacing: '-0.01em' }}>Live Classroom Intelligence</div>
+                    <div style={{ fontSize: '11px', color: 'rgba(148,163,184,0.82)', marginTop: '3px' }}>Teacher-only engagement signal</div>
+                  </div>
+                  <span style={{ fontSize: '10px', fontWeight: 700, color: '#93C5FD', background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.18)', padding: '4px 8px', borderRadius: '999px' }}>
+                    {classroomParticipants.length} students
+                  </span>
+                </div>
+
+                <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '340px', overflowY: 'auto' }}>
+                  {classroomParticipants.length === 0 ? (
+                    <div style={{ padding: '22px 12px', textAlign: 'center', color: 'rgba(148,163,184,0.75)', fontSize: '12px' }}>
+                      Waiting for participants to join.
+                    </div>
+                  ) : (
+                    classroomParticipants.map((participant) => {
+                      const snapshot = activityMap[participant.id];
+                      const status = snapshot?.status || 'inactive';
+                      const state = activityPalette[status];
+
+                      return (
+                        <motion.div
+                          key={participant.id}
+                          layout
+                          initial={{ opacity: 0, y: 6 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: 6 }}
+                          transition={{ duration: 0.18, ease: 'easeOut' }}
+                          style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 11px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.03)' }}
+                        >
+                          <div style={{ position: 'relative', width: '38px', height: '38px', borderRadius: '50%', background: participant.avatarColor, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 700, flexShrink: 0 }}>
+                            {participant.name.charAt(0).toUpperCase()}
+                            <span style={{ position: 'absolute', right: '-1px', bottom: '-1px', width: '11px', height: '11px', borderRadius: '50%', background: state.dot, border: '2px solid #020617' }} className={state.glow} />
+                          </div>
+
+                          <div style={{ minWidth: 0, flex: 1 }}>
+                            <div style={{ fontSize: '13px', fontWeight: 600, color: '#e2e8f0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {participant.name}
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '7px', marginTop: '4px', flexWrap: 'wrap' }}>
+                              <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.02em', color: state.dot, background: state.badge, border: '1px solid rgba(255,255,255,0.05)', padding: '3px 8px', borderRadius: '999px' }}>
+                                {state.label}
+                              </span>
+                              <span style={{ fontSize: '10px', color: 'rgba(148,163,184,0.78)' }}>
+                                {snapshot ? formatLastActive(snapshot.lastActive) : 'No recent activity'}
+                              </span>
+                            </div>
+                          </div>
+                        </motion.div>
+                      );
+                    })
+                  )}
+                </div>
+              </motion.aside>
+            )}
+
             <Editor
               height="100%"
               language={language}
@@ -477,6 +640,7 @@ export default function Room() {
                 if (value !== undefined && !isRemoteUpdate.current) {
                   updateCode(value);
                   queueCodeEmit(value);
+                  emitTypingActivity();
                 }
               }}
               theme="vs-dark"
