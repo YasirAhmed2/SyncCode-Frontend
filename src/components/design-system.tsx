@@ -4,6 +4,7 @@ import { LucideIcon } from 'lucide-react';
 
 /* ============================================================
    DESIGN SYSTEM COMPONENTS — Enterprise SaaS (Stripe / Linear)
+   Theme-aware: uses CSS variables for dark/light support
 ============================================================ */
 
 /* ── Badge ── */
@@ -16,32 +17,12 @@ export const Badge = ({
   variant?: 'default' | 'success' | 'warning' | 'error' | 'blue';
   icon?: LucideIcon;
 }) => {
-  const styles: Record<string, React.CSSProperties> = {
-    default: {
-      background: 'rgba(99,102,241,0.1)',
-      border: '1px solid rgba(99,102,241,0.22)',
-      color: '#a5b4fc',
-    },
-    success: {
-      background: 'rgba(16,185,129,0.1)',
-      border: '1px solid rgba(16,185,129,0.22)',
-      color: '#6ee7b7',
-    },
-    warning: {
-      background: 'rgba(245,158,11,0.1)',
-      border: '1px solid rgba(245,158,11,0.22)',
-      color: '#fcd34d',
-    },
-    error: {
-      background: 'rgba(239,68,68,0.1)',
-      border: '1px solid rgba(239,68,68,0.22)',
-      color: '#fca5a5',
-    },
-    blue: {
-      background: 'rgba(37,99,235,0.1)',
-      border: '1px solid rgba(37,99,235,0.22)',
-      color: '#93c5fd',
-    },
+  const variantClasses: Record<string, string> = {
+    default: 'bg-primary/10 border-primary/20 text-primary',
+    success: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500',
+    warning: 'bg-amber-500/10 border-amber-500/20 text-amber-500',
+    error: 'bg-red-500/10 border-red-500/20 text-red-500',
+    blue: 'bg-blue-500/10 border-blue-500/20 text-blue-500',
   };
 
   return (
@@ -49,17 +30,7 @@ export const Badge = ({
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.3 }}
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: '6px',
-        padding: '5px 12px',
-        borderRadius: '999px',
-        fontSize: '12px',
-        fontWeight: 500,
-        letterSpacing: '0.01em',
-        ...styles[variant],
-      }}
+      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium ${variantClasses[variant]}`}
     >
       {Icon && <Icon size={13} />}
       {children}
@@ -88,41 +59,15 @@ export const SectionHeading = ({
       className={align === 'center' ? 'text-center' : ''}
     >
       {eyebrow && (
-        <p
-          style={{
-            fontSize: '12px',
-            fontWeight: 600,
-            letterSpacing: '0.08em',
-            textTransform: 'uppercase',
-            color: '#818cf8',
-            marginBottom: '12px',
-          }}
-        >
+        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.08em] text-primary">
           {eyebrow}
         </p>
       )}
-      <h2
-        style={{
-          fontSize: 'clamp(1.875rem, 4vw, 2.75rem)',
-          fontWeight: 800,
-          color: '#f1f5f9',
-          lineHeight: 1.15,
-          letterSpacing: '-0.02em',
-          marginBottom: '12px',
-        }}
-      >
+      <h2 className="text-[clamp(1.875rem,4vw,2.75rem)] font-extrabold leading-[1.15] tracking-[-0.02em] text-foreground">
         {title}
       </h2>
       {subtitle && (
-        <p
-          style={{
-            fontSize: '1.0625rem',
-            color: '#6B7280',
-            maxWidth: '540px',
-            lineHeight: 1.65,
-            ...(align === 'center' ? { margin: '0 auto' } : {}),
-          }}
-        >
+        <p className={`mt-3 text-base leading-relaxed text-muted-foreground ${align === 'center' ? 'mx-auto' : ''}`} style={{ maxWidth: '540px' }}>
           {subtitle}
         </p>
       )}
@@ -144,11 +89,11 @@ export const FeatureCard = ({
   index?: number;
   accent?: 'indigo' | 'blue';
 }) => {
-  const accentMap = {
-    indigo: { bg: 'rgba(99,102,241,0.12)', color: '#818CF8', border: 'rgba(99,102,241,0.2)' },
-    blue:   { bg: 'rgba(37,99,235,0.12)',  color: '#60A5FA', border: 'rgba(37,99,235,0.2)'  },
+  const accentClasses = {
+    indigo: { iconBg: 'bg-primary/10 border-primary/20', iconColor: 'text-primary' },
+    blue:   { iconBg: 'bg-blue-500/10 border-blue-500/20', iconColor: 'text-blue-500' },
   };
-  const a = accentMap[accent];
+  const a = accentClasses[accent];
 
   return (
     <motion.div
@@ -157,67 +102,18 @@ export const FeatureCard = ({
       viewport={{ once: true }}
       transition={{ duration: 0.45, delay: index * 0.08 }}
       whileHover={{ y: -4 }}
-      style={{
-        padding: '24px',
-        borderRadius: '16px',
-        background: '#111827',
-        border: '1px solid rgba(255,255,255,0.07)',
-        position: 'relative',
-        overflow: 'hidden',
-        cursor: 'default',
-        transition: 'border-color 0.2s, box-shadow 0.2s',
-      }}
-      className="group hover:border-indigo-500/25 hover:shadow-[0_8px_28px_rgba(0,0,0,0.4)]"
+      className="group relative cursor-default overflow-hidden rounded-2xl border border-border/70 bg-card p-6 transition-all duration-200 hover:border-primary/25 hover:shadow-[var(--shadow-card-hover)]"
     >
-      {/* Subtle top-left gradient on hover */}
-      <div
-        style={{
-          position: 'absolute',
-          top: 0, left: 0,
-          width: '120px', height: '120px',
-          background: `radial-gradient(circle at top left, ${a.bg}, transparent 70%)`,
-          opacity: 0,
-          transition: 'opacity 0.3s',
-        }}
-        className="group-hover:!opacity-100"
-      />
+      <div className="pointer-events-none absolute left-0 top-0 h-[120px] w-[120px] rounded-full bg-primary/5 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
 
-      {/* Icon */}
-      <div
-        style={{
-          width: '44px', height: '44px',
-          borderRadius: '12px',
-          background: a.bg,
-          border: `1px solid ${a.border}`,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginBottom: '16px',
-          position: 'relative',
-        }}
-      >
-        <Icon size={20} color={a.color} />
+      <div className={`relative mb-4 flex h-11 w-11 items-center justify-center rounded-xl border ${a.iconBg}`}>
+        <Icon size={20} className={a.iconColor} />
       </div>
 
-      <h3
-        style={{
-          fontSize: '16px',
-          fontWeight: 600,
-          color: '#f1f5f9',
-          marginBottom: '8px',
-          position: 'relative',
-        }}
-      >
+      <h3 className="relative mb-2 text-base font-semibold text-foreground">
         {title}
       </h3>
-      <p
-        style={{
-          fontSize: '14px',
-          color: '#6B7280',
-          lineHeight: 1.65,
-          position: 'relative',
-        }}
-      >
+      <p className="relative text-sm leading-relaxed text-muted-foreground">
         {description}
       </p>
     </motion.div>
@@ -245,60 +141,26 @@ export const ProblemSolutionCard = ({
       whileInView={{ opacity: 1, x: 0 }}
       viewport={{ once: true }}
       transition={{ duration: 0.5 }}
-      style={{
-        padding: '28px',
-        borderRadius: '16px',
-        background: '#111827',
-        border: isProblem
-          ? '1px solid rgba(239,68,68,0.15)'
-          : '1px solid rgba(16,185,129,0.15)',
-      }}
+      className={`rounded-2xl border bg-card p-7 ${isProblem ? 'border-destructive/15' : 'border-emerald-500/15'}`}
     >
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', marginBottom: '20px' }}>
-        <div
-          style={{
-            padding: '10px',
-            borderRadius: '10px',
-            background: isProblem ? 'rgba(239,68,68,0.1)' : 'rgba(16,185,129,0.1)',
-            color: isProblem ? '#f87171' : '#34d399',
-          }}
-        >
+      <div className="mb-5 flex items-start gap-3.5">
+        <div className={`rounded-xl p-2.5 ${isProblem ? 'bg-destructive/10 text-destructive' : 'bg-emerald-500/10 text-emerald-500'}`}>
           <Icon size={20} />
         </div>
         <div>
-          <p
-            style={{
-              fontSize: '11px',
-              fontWeight: 700,
-              letterSpacing: '0.07em',
-              textTransform: 'uppercase',
-              color: isProblem ? '#f87171' : '#34d399',
-              marginBottom: '4px',
-            }}
-          >
+          <p className={`mb-1 text-[11px] font-bold uppercase tracking-[0.07em] ${isProblem ? 'text-destructive' : 'text-emerald-500'}`}>
             {isProblem ? 'The Problem' : 'The Solution'}
           </p>
-          <h3 style={{ fontSize: '20px', fontWeight: 700, color: '#f1f5f9' }}>{title}</h3>
+          <h3 className="text-xl font-bold text-foreground">{title}</h3>
         </div>
       </div>
-      <p style={{ fontSize: '14px', color: '#6B7280', marginBottom: '20px', lineHeight: 1.65 }}>
+      <p className="mb-5 text-sm leading-relaxed text-muted-foreground">
         {description}
       </p>
-      <ul style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+      <ul className="flex flex-col gap-2.5">
         {items.map((item, idx) => (
-          <li
-            key={idx}
-            style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', fontSize: '14px', color: '#9CA3AF' }}
-          >
-            <span
-              style={{
-                marginTop: '6px',
-                width: '6px', height: '6px',
-                borderRadius: '50%',
-                flexShrink: 0,
-                background: isProblem ? '#f87171' : '#34d399',
-              }}
-            />
+          <li key={idx} className="flex items-start gap-2.5 text-sm text-muted-foreground">
+            <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${isProblem ? 'bg-destructive' : 'bg-emerald-500'}`} />
             {item}
           </li>
         ))}
@@ -327,58 +189,23 @@ export const TimelineStep = ({
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
       transition={{ duration: 0.45, delay: number * 0.09 }}
-      style={{ position: 'relative' }}
+      className="relative"
     >
       {!isLast && (
-        <div
-          style={{
-            position: 'absolute',
-            left: '21px',
-            top: '52px',
-            width: '2px',
-            height: '40px',
-            background: 'linear-gradient(to bottom, rgba(99,102,241,0.4), transparent)',
-          }}
-        />
+        <div className="absolute left-[21px] top-[52px] h-10 w-0.5 bg-gradient-to-b from-primary/40 to-transparent" />
       )}
-
-      <div style={{ display: 'flex', gap: '20px' }}>
-        {/* Circle */}
-        <div style={{ flexShrink: 0 }}>
-          <div
-            style={{
-              width: '44px', height: '44px',
-              borderRadius: '50%',
-              border: '1.5px solid rgba(99,102,241,0.4)',
-              background: 'rgba(99,102,241,0.1)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#818cf8',
-            }}
-          >
+      <div className="flex gap-5">
+        <div className="shrink-0">
+          <div className="flex h-11 w-11 items-center justify-center rounded-full border-[1.5px] border-primary/40 bg-primary/10 text-primary">
             <Icon size={18} />
           </div>
         </div>
-
-        {/* Content */}
-        <div style={{ flex: 1, paddingBottom: '28px' }}>
-          <p
-            style={{
-              fontSize: '11px',
-              fontWeight: 700,
-              letterSpacing: '0.06em',
-              textTransform: 'uppercase',
-              color: '#6366F1',
-              marginBottom: '4px',
-            }}
-          >
+        <div className="flex-1 pb-7">
+          <p className="mb-1 text-[11px] font-bold uppercase tracking-[0.06em] text-primary">
             Step {number}
           </p>
-          <h3 style={{ fontSize: '18px', fontWeight: 600, color: '#f1f5f9', marginBottom: '6px' }}>
-            {title}
-          </h3>
-          <p style={{ fontSize: '14px', color: '#6B7280', lineHeight: 1.65 }}>{description}</p>
+          <h3 className="mb-1.5 text-lg font-semibold text-foreground">{title}</h3>
+          <p className="text-sm leading-relaxed text-muted-foreground">{description}</p>
         </div>
       </div>
     </motion.div>
@@ -401,29 +228,16 @@ export const CTAButton = ({
   icon?: LucideIcon;
   className?: string;
 }) => {
-  const variantStyles: Record<string, React.CSSProperties> = {
-    primary: {
-      background: '#4F46E5',
-      color: '#fff',
-      border: 'none',
-      boxShadow: '0 2px 8px rgba(0,0,0,0.25), 0 4px 16px rgba(99,102,241,0.2)',
-    },
-    secondary: {
-      background: 'rgba(255,255,255,0.06)',
-      color: '#f1f5f9',
-      border: '1px solid rgba(255,255,255,0.12)',
-    },
-    outline: {
-      background: 'transparent',
-      color: '#f1f5f9',
-      border: '1.5px solid rgba(255,255,255,0.2)',
-    },
+  const variantClasses: Record<string, string> = {
+    primary: 'bg-primary text-primary-foreground shadow-[var(--shadow-primary)]',
+    secondary: 'bg-card border border-border text-foreground',
+    outline: 'bg-transparent border-[1.5px] border-border text-foreground',
   };
 
-  const sizeStyles: Record<string, React.CSSProperties> = {
-    sm: { padding: '8px 16px', fontSize: '13px' },
-    md: { padding: '11px 22px', fontSize: '15px' },
-    lg: { padding: '14px 28px', fontSize: '16px' },
+  const sizeClasses: Record<string, string> = {
+    sm: 'px-4 py-2 text-[13px]',
+    md: 'px-5 py-2.5 text-[15px]',
+    lg: 'px-7 py-3.5 text-base',
   };
 
   return (
@@ -431,19 +245,7 @@ export const CTAButton = ({
       whileHover={{ scale: 1.02, translateY: -1 }}
       whileTap={{ scale: 0.98 }}
       onClick={onClick}
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: '8px',
-        borderRadius: '12px',
-        fontWeight: 600,
-        fontFamily: 'Inter, system-ui, sans-serif',
-        cursor: 'pointer',
-        transition: 'all 0.15s ease',
-        ...variantStyles[variant],
-        ...sizeStyles[size],
-      }}
-      className={className}
+      className={`inline-flex items-center gap-2 rounded-xl font-semibold transition-all duration-150 ${variantClasses[variant]} ${sizeClasses[size]} ${className}`}
     >
       {children}
       {Icon && <Icon size={15} />}
@@ -466,15 +268,7 @@ export const GlassCard = ({
       whileHover={{ y: -3 }}
       transition={{ duration: 0.2 }}
       onClick={onClick}
-      style={{
-        padding: '24px',
-        borderRadius: '16px',
-        background: '#111827',
-        border: '1px solid rgba(255,255,255,0.07)',
-        cursor: onClick ? 'pointer' : 'default',
-        transition: 'border-color 0.2s, box-shadow 0.2s',
-      }}
-      className={`hover:border-indigo-500/25 hover:shadow-[0_8px_28px_rgba(0,0,0,0.35)] ${className}`}
+      className={`rounded-2xl border border-border/70 bg-card p-6 transition-all duration-200 hover:border-primary/25 hover:shadow-[var(--shadow-card-hover)] ${onClick ? 'cursor-pointer' : 'cursor-default'} ${className}`}
     >
       {children}
     </motion.div>
@@ -500,21 +294,13 @@ export const EmptyState = ({
       initial={{ opacity: 0, scale: 0.97 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.3 }}
-      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '56px 16px', textAlign: 'center' }}
+      className="flex flex-col items-center px-4 py-14 text-center"
     >
-      <div
-        style={{
-          marginBottom: '20px',
-          padding: '16px',
-          borderRadius: '50%',
-          background: 'rgba(99,102,241,0.1)',
-          border: '1px solid rgba(99,102,241,0.18)',
-        }}
-      >
-        <Icon size={32} color="#818cf8" />
+      <div className="mb-5 rounded-full border border-primary/20 bg-primary/10 p-4">
+        <Icon size={32} className="text-primary" />
       </div>
-      <h3 style={{ fontSize: '20px', fontWeight: 700, color: '#f1f5f9', marginBottom: '8px' }}>{title}</h3>
-      <p style={{ fontSize: '14px', color: '#6B7280', marginBottom: '28px', maxWidth: '320px', lineHeight: 1.65 }}>
+      <h3 className="mb-2 text-xl font-bold text-foreground">{title}</h3>
+      <p className="mb-7 max-w-[320px] text-sm leading-relaxed text-muted-foreground">
         {description}
       </p>
       {action && actionLabel && (
@@ -532,20 +318,11 @@ export const LoadingState = () => {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '48px 0' }}
+      className="flex items-center justify-center py-12"
     >
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px' }}>
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
-          style={{
-            width: '36px', height: '36px',
-            borderRadius: '50%',
-            border: '2px solid rgba(255,255,255,0.08)',
-            borderTop: '2px solid #6366F1',
-          }}
-        />
-        <p style={{ fontSize: '13px', color: '#6B7280' }}>Loading…</p>
+      <div className="flex flex-col items-center gap-3.5">
+        <div className="h-9 w-9 animate-spin rounded-full border-2 border-border border-t-primary" />
+        <p className="text-[13px] text-muted-foreground">Loading…</p>
       </div>
     </motion.div>
   );

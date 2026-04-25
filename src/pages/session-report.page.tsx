@@ -53,25 +53,24 @@ export default function SessionReportPage() {
 
   if (isLoading) {
     return (
-      <div style={{ minHeight: '100vh', background: '#080C14', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '16px' }}>
-        <div style={{ width: '40px', height: '40px', borderRadius: '50%', border: '3px solid rgba(99,102,241,0.2)', borderTopColor: '#818CF8', animation: 'spin 0.9s linear infinite' }} />
-        <div style={{ fontSize: '14px', color: 'rgba(148,163,184,0.6)' }}>Loading session insights…</div>
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <div className="min-h-screen bg-background flex items-center justify-center flex-col gap-4">
+        <div className="spinner-lg" />
+        <div className="text-sm text-muted-foreground">Loading session insights…</div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div style={{ minHeight: '100vh', background: '#080C14', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '16px', padding: '20px' }}>
-        <div style={{ width: '52px', height: '52px', borderRadius: '16px', background: 'rgba(239,68,68,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <AlertCircle size={26} color="#F87171" />
+      <div className="min-h-screen bg-background flex items-center justify-center flex-col gap-4 p-5">
+        <div className="w-[52px] h-[52px] rounded-2xl bg-destructive/10 flex items-center justify-center">
+          <AlertCircle size={26} className="text-destructive" />
         </div>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '16px', fontWeight: 700, color: '#e2e8f0', marginBottom: '6px' }}>No Insights Yet</div>
-          <div style={{ fontSize: '13px', color: 'rgba(148,163,184,0.6)', maxWidth: '320px' }}>{error}</div>
+        <div className="text-center">
+          <div className="text-base font-bold text-foreground mb-1.5">No Insights Yet</div>
+          <div className="text-[13px] text-muted-foreground max-w-[320px]">{error}</div>
         </div>
-        <button onClick={() => navigate(-1)} style={{ padding: '10px 20px', borderRadius: '10px', background: 'rgba(99,102,241,0.15)', color: '#818CF8', border: '1px solid rgba(99,102,241,0.3)', fontSize: '13px', cursor: 'pointer', fontWeight: 600 }}>
+        <button onClick={() => navigate(-1)} className="px-5 py-2.5 rounded-xl bg-primary/15 text-primary border border-primary/30 text-[13px] cursor-pointer font-semibold hover:bg-primary/20 transition-colors">
           Go Back
         </button>
       </div>
@@ -81,20 +80,20 @@ export default function SessionReportPage() {
   const { analytics, sessionDurationMs, startedAt, roomName, isTeacher } = report!;
 
   return (
-    <div style={{ minHeight: '100vh', background: '#080C14', color: '#f1f5f9', fontFamily: 'Inter, sans-serif' }}>
+    <div className="min-h-screen bg-background text-foreground font-sans">
       {/* ── HEADER ── */}
-      <header style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(13,17,23,0.9)', backdropFilter: 'blur(20px)', position: 'sticky', top: 0, zIndex: 10 }}>
+      <header className="border-b border-border/50 bg-card/90 backdrop-blur-xl sticky top-0 z-10">
         <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '0 24px', height: '58px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <button
               onClick={() => navigate(-1)}
-              style={{ width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(148,163,184,0.7)', cursor: 'pointer', transition: 'all 0.15s' }}
+              className="w-8 h-8 rounded-lg flex items-center justify-center bg-muted/50 border border-border/50 text-muted-foreground cursor-pointer transition-all duration-150 hover:text-foreground hover:bg-muted"
             >
               <ChevronLeft size={16} />
             </button>
             <div>
-              <div style={{ fontSize: '15px', fontWeight: 700, color: '#f8fafc', lineHeight: 1.2 }}>{roomName}</div>
-              <div style={{ fontSize: '11px', color: 'rgba(148,163,184,0.6)' }}>Session Insights</div>
+              <div className="text-[15px] font-bold text-foreground leading-tight">{roomName}</div>
+              <div className="text-[11px] text-muted-foreground">Session Insights</div>
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -318,9 +317,7 @@ export default function SessionReportPage() {
       </main>
 
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .hover-row:hover { background: rgba(255,255,255,0.025); }
+        .hover-row:hover { background: hsl(var(--muted) / 0.3); }
       `}</style>
     </div>
   );

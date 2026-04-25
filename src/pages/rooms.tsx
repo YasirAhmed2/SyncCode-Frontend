@@ -32,7 +32,7 @@ export default function Room() {
   const { user } = useAuth();
   const { currentRoom, code, language, messages, updateCode, setLanguage, addMessage, setRoomMessages, joinRoom, leaveRoom } = useRoom();
   const { toast } = useToast();
-  const { theme } = useTheme();
+  const { isDarkMode } = useTheme();
 
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isOutputOpen, setIsOutputOpen] = useState(false);
@@ -463,8 +463,8 @@ export default function Room() {
               <Code2 size={15} color="white" />
             </div>
             <div>
-              <div style={{ fontSize: '13px', fontWeight: 600, color: '#f1f5f9', lineHeight: 1 }}>{currentRoom?.name || 'Coding Room'}</div>
-              <button onClick={handleCopyRoomId} style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontFamily: 'JetBrains Mono, monospace', padding: 0, marginTop: '2px', transition: 'color 0.15s' }} className="hover:text-white/60">
+              <div style={{ fontSize: '13px', fontWeight: 600, lineHeight: 1 }} className="text-foreground">{currentRoom?.name || 'Coding Room'}</div>
+              <button onClick={handleCopyRoomId} className="text-muted-foreground/50 hover:text-muted-foreground bg-transparent border-none cursor-pointer flex items-center gap-1 font-mono p-0 mt-0.5 transition-colors duration-150" style={{ fontSize: '11px' }}>
                 {roomId?.slice(0, 16)}… {copied ? <Check size={11} color="#34D399" /> : <Copy size={11} />}
               </button>
             </div>
@@ -690,7 +690,7 @@ export default function Room() {
                   emitTypingActivity();
                 }
               }}
-              theme={theme === 'dark' ? 'vs-dark' : 'light'}
+              theme={isDarkMode ? 'vs-dark' : 'light'}
               options={{ readOnly: isEditorReadOnly, fontSize: 14, fontFamily: 'JetBrains Mono, monospace', fontLigatures: true, minimap: { enabled: false }, padding: { top: 18, bottom: 18 }, scrollBeyondLastLine: false, automaticLayout: true, tabSize: 2, wordWrap: 'on', lineNumbersMinChars: 3, renderLineHighlight: 'gutter', cursorBlinking: 'smooth', smoothScrolling: true }}
             />
 

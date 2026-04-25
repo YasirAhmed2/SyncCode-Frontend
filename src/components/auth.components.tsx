@@ -18,16 +18,16 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden flex-col justify-between px-14 py-12 bg-card border-r border-border/50">
 
         {/* Subtle orbs */}
-        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
-          <div style={{ position: 'absolute', top: '20%', left: '20%', width: '320px', height: '320px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(99,102,241,0.08) 0%, transparent 70%)' }} />
-          <div style={{ position: 'absolute', bottom: '20%', right: '15%', width: '250px', height: '250px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(37,99,235,0.06) 0%, transparent 70%)' }} />
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-[20%] left-[20%] w-[320px] h-[320px] rounded-full bg-[radial-gradient(circle,hsl(var(--primary)/0.08)_0%,transparent_70%)]" />
+          <div className="absolute bottom-[20%] right-[15%] w-[250px] h-[250px] rounded-full bg-[radial-gradient(circle,hsl(var(--accent)/0.06)_0%,transparent_70%)]" />
           {/* Dot grid */}
-          <div style={{ position: 'absolute', inset: 0, opacity: 0.025, backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.8) 1px, transparent 1px)', backgroundSize: '28px 28px' }} />
+          <div className="absolute inset-0 opacity-[0.025]" style={{ backgroundImage: 'radial-gradient(circle, currentColor 1px, transparent 1px)', backgroundSize: '28px 28px' }} />
         </div>
 
         {/* Logo */}
         <Link to="/" className="flex items-center gap-2.5 relative z-10 no-underline">
-          <div className="w-[38px] h-[38px] rounded-[10px] bg-primary flex items-center justify-center shadow-[0_4px_16px_rgba(99,102,241,0.3)]">
+          <div className="w-[38px] h-[38px] rounded-[10px] bg-primary flex items-center justify-center shadow-[var(--shadow-primary)]">
             <Code2 size={19} color="white" />
           </div>
           <span className="text-[20px] font-bold text-foreground tracking-[-0.01em]">
@@ -84,7 +84,7 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
         <div className="absolute top-6 right-6 z-50">
           <ThemeToggle />
         </div>
-        <div className="absolute top-[30%] left-1/2 -translate-x-1/2 w-[400px] h-[400px] rounded-full bg-[radial-gradient(circle,rgba(99,102,241,0.04)_0%,transparent_70%)] pointer-events-none" />
+        <div className="absolute top-[30%] left-1/2 -translate-x-1/2 w-[400px] h-[400px] rounded-full bg-[radial-gradient(circle,hsl(var(--primary)/0.04)_0%,transparent_70%)] pointer-events-none" />
 
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45 }} className="w-full max-w-[420px] relative">
           {/* Mobile Logo */}
