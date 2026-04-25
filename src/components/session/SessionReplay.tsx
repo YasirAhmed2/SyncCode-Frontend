@@ -31,12 +31,11 @@ export default function SessionReplay({
 
   // Playback state
   const [isPlaying, setIsPlaying] = useState(false);
-  const [speed, setSpeed] = useState<1 | 2>(1);
+  const [speed, setSpeed] = useState<1 | 2 | 4>(1);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedUserId, setSelectedUserId] = useState<string>('all');
 
   const playTimerRef = useRef<number | null>(null);
-  const lastTickRef = useRef<number>(0);
 
   // Derived list of events to replay (filtered by user if student, or by selection if teacher)
   const events: SessionEvent[] = (() => {
@@ -45,6 +44,16 @@ export default function SessionReplay({
     if (selectedUserId === 'all') return recording.events;
     return recording.events.filter((e) => e.userId === selectedUserId);
   })();
+
+  // Build a map of userId -> userName from events
+  const userNameMap: Record<string, string> = {};
+  if (recording) {
+    for (const evt of recording.events) {
+      if (evt.userId && (evt as any).userName) {
+        userNameMap[evt.userId] = (evt as any).userName;
+      }
+    }
+  }
 
   // Unique user IDs for teacher filter dropdown
   const uniqueUserIds = recording
@@ -61,6 +70,7 @@ export default function SessionReplay({
   // ─── LOAD ─────────────────────────────────────────────────────────────────
   useEffect(() => {
     setIsLoading(true);
+    setError(null);
     sessionService
       .getRecording(roomId)
       .then((data) => {
@@ -88,61 +98,84 @@ export default function SessionReplay({
     [events, onEditorUpdate]
   );
 
-  // ─── PLAYBACK TICK ────────────────────────────────────────────────────────
+  // ─── PLAYBACK TICK (setTimeout-based, gap-aware) ──────────────────────────
   useEffect(() => {
     if (!isPlaying || events.length === 0) return;
 
-    const tick = () => {
-      const now = performance.now();
-      const elapsed = (now - lastTickRef.current) * speed;
-      lastTickRef.current = now;
+    const scheduleNext = (idx: number) => {
+      if (idx >= events.length - 1) {
+        setIsPlaying(false);
+        return;
+      }
 
-      setCurrentIndex((prev) => {
-        if (prev >= events.length - 1) {
-          setIsPlaying(false);
-          return prev;
-        }
-        // Find next event whose offset fits in elapsed real-time
-        const baseTs = events[0].timestamp;
-        const currentTs = events[prev].timestamp;
-        const nextTs = currentTs + elapsed;
+      // Calculate the real gap between current event and next event
+      const gapMs = events[idx + 1].timestamp - events[idx].timestamp;
+      // Scale by speed, but cap minimum delay at 16ms to stay responsive
+      const delayMs = Math.max(16, gapMs / speed);
+      // Cap max delay at 2 seconds to avoid long stalls on idle gaps
+      const cappedDelay = Math.min(delayMs, 2000);
 
-        let next = prev + 1;
-        while (next < events.length - 1 && events[next].timestamp < nextTs) {
-          next++;
+      playTimerRef.current = window.setTimeout(() => {
+        const nextIdx = idx + 1;
+        setCurrentIndex(nextIdx);
+        if (events[nextIdx]) {
+          onEditorUpdate(events[nextIdx].code);
         }
-        if (events[next]) {
-          onEditorUpdate(events[next].code);
-        }
-        return next;
-      });
-
-      playTimerRef.current = window.requestAnimationFrame(tick);
+        scheduleNext(nextIdx);
+      }, cappedDelay);
     };
 
-    lastTickRef.current = performance.now();
-    playTimerRef.current = window.requestAnimationFrame(tick);
+    scheduleNext(currentIndex);
 
     return () => {
-      if (playTimerRef.current !== null) cancelAnimationFrame(playTimerRef.current);
+      if (playTimerRef.current !== null) {
+        clearTimeout(playTimerRef.current);
+        playTimerRef.current = null;
+      }
     };
-  }, [isPlaying, speed, events, onEditorUpdate]);
+  }, [isPlaying, speed, events, onEditorUpdate, currentIndex]);
 
   const handlePlayPause = () => {
-    if (currentIndex >= events.length - 1) {
-      seekTo(0);
+    if (isPlaying) {
+      // Pause: clear any pending timer
+      if (playTimerRef.current !== null) {
+        clearTimeout(playTimerRef.current);
+        playTimerRef.current = null;
+      }
+      setIsPlaying(false);
+    } else {
+      // Play: restart from beginning if at end
+      if (currentIndex >= events.length - 1) {
+        seekTo(0);
+        // Small delay to allow state to flush before starting playback
+        setTimeout(() => setIsPlaying(true), 50);
+      } else {
+        setIsPlaying(true);
+      }
     }
-    setIsPlaying((p) => !p);
   };
 
   const handleRestart = () => {
+    if (playTimerRef.current !== null) {
+      clearTimeout(playTimerRef.current);
+      playTimerRef.current = null;
+    }
     setIsPlaying(false);
     seekTo(0);
   };
 
   const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (playTimerRef.current !== null) {
+      clearTimeout(playTimerRef.current);
+      playTimerRef.current = null;
+    }
     setIsPlaying(false);
     seekTo(Number(e.target.value));
+  };
+
+  const handleSpeedToggle = () => {
+    // Cycle through 1x → 2x → 4x
+    setSpeed((prev) => (prev === 1 ? 2 : prev === 2 ? 4 : 1));
   };
 
   // ─── UI ───────────────────────────────────────────────────────────────────
@@ -158,22 +191,20 @@ export default function SessionReplay({
         left: 0,
         right: 0,
         zIndex: 40,
-        background: 'linear-gradient(180deg, rgba(10,14,26,0.97) 0%, rgba(7,10,20,0.99) 100%)',
-        borderTop: '1px solid rgba(99,102,241,0.3)',
         backdropFilter: 'blur(20px)',
         padding: '16px 20px 20px',
-        boxShadow: '0 -8px 40px rgba(99,102,241,0.12)',
       }}
+      className="bg-card/95 border-t border-border shadow-[0_-8px_40px_rgba(0,0,0,0.15)]"
     >
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: 'rgba(99,102,241,0.18)', border: '1px solid rgba(99,102,241,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Clock size={14} color="#818CF8" />
+          <div className="w-7 h-7 rounded-lg bg-primary/15 border border-primary/30 flex items-center justify-center">
+            <Clock size={14} className="text-primary" />
           </div>
           <div>
-            <div style={{ fontSize: '13px', fontWeight: 700, color: '#e2e8f0' }}>Session Replay</div>
-            <div style={{ fontSize: '11px', color: 'rgba(148,163,184,0.7)', marginTop: '1px' }}>
+            <div className="text-[13px] font-bold text-foreground">Session Replay</div>
+            <div className="text-[11px] text-muted-foreground mt-px">
               {isTeacher ? 'Reviewing full session' : 'Your coding session'}
             </div>
           </div>
@@ -182,14 +213,12 @@ export default function SessionReplay({
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           {/* Speed toggle */}
           <button
-            onClick={() => setSpeed(speed === 1 ? 2 : 1)}
+            onClick={handleSpeedToggle}
+            className="flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold border cursor-pointer transition-all duration-150"
             style={{
-              display: 'flex', alignItems: 'center', gap: '4px',
-              padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 700,
-              background: speed === 2 ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.05)',
-              color: speed === 2 ? '#818CF8' : 'rgba(148,163,184,0.8)',
-              border: `1px solid ${speed === 2 ? 'rgba(99,102,241,0.4)' : 'rgba(255,255,255,0.08)'}`,
-              cursor: 'pointer', transition: 'all 0.15s',
+              background: speed > 1 ? 'hsl(var(--primary) / 0.15)' : 'hsl(var(--muted) / 0.5)',
+              color: speed > 1 ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground))',
+              borderColor: speed > 1 ? 'hsl(var(--primary) / 0.35)' : 'hsl(var(--border))',
             }}
           >
             <Zap size={11} />
@@ -201,16 +230,12 @@ export default function SessionReplay({
             <select
               value={selectedUserId}
               onChange={(e) => { setSelectedUserId(e.target.value); setIsPlaying(false); seekTo(0); }}
-              style={{
-                height: '28px', padding: '0 8px', borderRadius: '6px', fontSize: '11px',
-                background: 'rgba(255,255,255,0.05)', color: '#e2e8f0',
-                border: '1px solid rgba(255,255,255,0.09)', outline: 'none',
-              }}
+              className="h-7 px-2 rounded-md text-[11px] bg-muted/50 text-foreground border border-border outline-none"
             >
               <option value="all">All Users</option>
               {uniqueUserIds.map((id) => (
-                <option key={id} value={id} style={{ background: '#0D1117' }}>
-                  {id.slice(-6)}
+                <option key={id} value={id}>
+                  {userNameMap[id] || id.slice(-6)}
                 </option>
               ))}
             </select>
@@ -218,7 +243,7 @@ export default function SessionReplay({
 
           <button
             onClick={onClose}
-            style={{ width: '28px', height: '28px', borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', color: 'rgba(148,163,184,0.6)', cursor: 'pointer', transition: 'color 0.15s' }}
+            className="w-7 h-7 rounded-lg flex items-center justify-center bg-transparent border-none text-muted-foreground cursor-pointer transition-colors duration-150 hover:text-foreground"
           >
             <X size={14} />
           </button>
@@ -227,25 +252,25 @@ export default function SessionReplay({
 
       {/* Content */}
       {isLoading ? (
-        <div style={{ textAlign: 'center', padding: '20px 0', color: 'rgba(148,163,184,0.6)', fontSize: '13px' }}>
-          <div style={{ width: '20px', height: '20px', border: '2px solid rgba(99,102,241,0.3)', borderTopColor: '#818CF8', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 10px' }} />
+        <div className="text-center py-5 text-muted-foreground text-[13px]">
+          <div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-2.5" />
           Loading recording…
         </div>
       ) : error ? (
-        <div style={{ padding: '16px', borderRadius: '10px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#FCA5A5', fontSize: '12px', textAlign: 'center' }}>
+        <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-[12px] text-center">
           {error}
         </div>
       ) : events.length === 0 ? (
-        <div style={{ padding: '16px', borderRadius: '10px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(148,163,184,0.6)', fontSize: '12px', textAlign: 'center' }}>
+        <div className="p-4 rounded-xl bg-muted/30 border border-border text-muted-foreground text-[12px] text-center">
           No coding activity recorded in this session.
         </div>
       ) : (
         <>
           {/* Timeline slider */}
           <div style={{ marginBottom: '14px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'rgba(100,116,139,0.8)', fontFamily: 'JetBrains Mono, monospace', marginBottom: '6px' }}>
+            <div className="flex justify-between text-[10px] text-muted-foreground font-mono mb-1.5">
               <span>{formatDuration(currentOffsetMs)}</span>
-              <span style={{ color: 'rgba(99,102,241,0.7)' }}>{currentIndex + 1} / {events.length}</span>
+              <span className="text-primary/70">{currentIndex + 1} / {events.length}</span>
               <span>{formatDuration(totalDurationMs)}</span>
             </div>
             <div style={{ position: 'relative' }}>
@@ -259,7 +284,7 @@ export default function SessionReplay({
                 style={{
                   width: '100%',
                   height: '4px',
-                  accentColor: '#818CF8',
+                  accentColor: 'hsl(var(--primary))',
                   cursor: 'pointer',
                   borderRadius: '99px',
                 }}
@@ -272,7 +297,7 @@ export default function SessionReplay({
             <button
               onClick={handleRestart}
               title="Restart"
-              style={{ width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(148,163,184,0.7)', cursor: 'pointer', transition: 'all 0.15s', flexShrink: 0 }}
+              className="w-8 h-8 rounded-lg flex items-center justify-center bg-muted/50 border border-border text-muted-foreground cursor-pointer transition-all duration-150 hover:text-foreground hover:bg-muted shrink-0"
             >
               <SkipBack size={14} />
             </button>
@@ -294,15 +319,16 @@ export default function SessionReplay({
             </button>
 
             {/* Progress bar */}
-            <div style={{ flex: 1, height: '4px', background: 'rgba(255,255,255,0.06)', borderRadius: '99px', overflow: 'hidden' }}>
+            <div className="flex-1 h-1 bg-muted/50 rounded-full overflow-hidden">
               <motion.div
-                style={{ height: '100%', background: 'linear-gradient(90deg, #4F46E5, #818CF8)', borderRadius: '99px' }}
+                className="h-full rounded-full"
+                style={{ background: 'linear-gradient(90deg, hsl(var(--primary)), hsl(var(--primary) / 0.7))' }}
                 animate={{ width: events.length > 1 ? `${(currentIndex / (events.length - 1)) * 100}%` : '0%' }}
                 transition={{ duration: 0.05 }}
               />
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'rgba(100,116,139,0.7)', fontFamily: 'JetBrains Mono, monospace', flexShrink: 0 }}>
+            <div className="flex items-center gap-1 text-[11px] text-muted-foreground font-mono shrink-0">
               <ChevronRight size={11} />
               <span>{Math.round(events.length > 1 ? (currentIndex / (events.length - 1)) * 100 : 0)}%</span>
             </div>

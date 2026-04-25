@@ -97,7 +97,7 @@ export default function SessionReportPage() {
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '11px', color: 'rgba(148,163,184,0.5)' }}>
+            <span className="text-[11px] text-muted-foreground">
               {startedAt ? new Date(startedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}
             </span>
             <span style={{ fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: '99px', background: isTeacher ? 'rgba(99,102,241,0.12)' : 'rgba(16,185,129,0.1)', color: isTeacher ? '#818CF8' : '#34D399', border: `1px solid ${isTeacher ? 'rgba(99,102,241,0.25)' : 'rgba(16,185,129,0.2)'}` }}>
@@ -148,24 +148,18 @@ export default function SessionReportPage() {
                 initial="hidden"
                 animate="visible"
                 variants={cardVariants}
-                style={{
-                  background: 'linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.02) 100%)',
-                  border: '1px solid rgba(255,255,255,0.07)',
-                  borderRadius: '16px',
-                  padding: '20px',
-                  backdropFilter: 'blur(12px)',
-                }}
+                className="bg-card/70 border border-border rounded-2xl p-5 backdrop-blur-xl"
               >
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '14px' }}>
                   <div style={{ width: '40px', height: '40px', borderRadius: '11px', background: card.iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {card.icon}
                   </div>
                 </div>
-                <div style={{ fontSize: '24px', fontWeight: 800, color: '#f8fafc', letterSpacing: '-0.02em', marginBottom: '4px' }}>
+                <div className="text-2xl font-extrabold text-foreground mb-1" style={{ letterSpacing: '-0.02em' }}>
                   {card.value}
                 </div>
-                <div style={{ fontSize: '13px', fontWeight: 600, color: 'rgba(148,163,184,0.9)', marginBottom: '2px' }}>{card.label}</div>
-                <div style={{ fontSize: '11px', color: 'rgba(100,116,139,0.7)' }}>{card.sub}</div>
+                <div className="text-[13px] font-semibold text-muted-foreground mb-0.5">{card.label}</div>
+                <div className="text-[11px] text-muted-foreground/70">{card.sub}</div>
               </motion.div>
             ))}
           </div>
@@ -178,23 +172,23 @@ export default function SessionReportPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2, duration: 0.35 }}
-            style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '18px', overflow: 'hidden' }}
+            className="bg-card/70 border border-border rounded-2xl overflow-hidden"
           >
-            <div style={{ padding: '18px 22px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <TrendingUp size={16} color="#818CF8" />
-              <span style={{ fontSize: '14px', fontWeight: 700, color: '#e2e8f0' }}>
+            <div className="px-[22px] py-[18px] border-b border-border/60 flex items-center gap-2.5">
+              <TrendingUp size={16} className="text-primary" />
+              <span className="text-[14px] font-bold text-foreground">
                 {isTeacher ? 'Student Insights' : 'Your Activity'}
               </span>
               {isTeacher && (
-                <span style={{ marginLeft: 'auto', fontSize: '11px', fontWeight: 600, color: 'rgba(99,102,241,0.8)', background: 'rgba(99,102,241,0.1)', padding: '2px 8px', borderRadius: '99px' }}>
+                <span className="ml-auto text-[11px] font-semibold text-primary/80 bg-primary/10 px-2 py-0.5 rounded-full">
                   {analytics.userStats.length} students
                 </span>
               )}
             </div>
 
-            <div style={{ padding: '12px 0' }}>
+            <div className="py-3">
               {analytics.userStats.length === 0 ? (
-                <div style={{ padding: '32px 22px', textAlign: 'center', color: 'rgba(100,116,139,0.7)', fontSize: '13px' }}>
+                <div className="py-8 px-[22px] text-center text-muted-foreground text-[13px]">
                   No activity data recorded.
                 </div>
               ) : (
@@ -208,8 +202,7 @@ export default function SessionReportPage() {
                       initial={{ opacity: 0, x: -12 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: 0.25 + i * 0.06, duration: 0.3 }}
-                      style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '12px 22px', borderBottom: i < analytics.userStats.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none', transition: 'background 0.15s' }}
-                      className="hover-row"
+                      className="flex items-center gap-3.5 px-[22px] py-3 border-b border-border/40 last:border-b-0 hover:bg-muted/30 transition-colors"
                     >
                       {/* Avatar */}
                       <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: `hsl(${(stat.userId.charCodeAt(0) * 57) % 360}, 55%, 45%)`, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 700, flexShrink: 0 }}>
@@ -218,21 +211,21 @@ export default function SessionReportPage() {
 
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '7px' }}>
-                          <div style={{ fontSize: '13px', fontWeight: 600, color: '#e2e8f0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          <div className="text-[13px] font-semibold text-foreground" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {stat.userName}
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, marginLeft: '10px' }}>
                             <span style={{ fontSize: '10px', fontWeight: 700, color: engagement.color, background: engagement.bg, border: `1px solid ${engagement.color}30`, padding: '2px 8px', borderRadius: '99px' }}>
                               {engagement.label}
                             </span>
-                            <span style={{ fontSize: '11px', color: 'rgba(100,116,139,0.8)', fontFamily: 'JetBrains Mono, monospace' }}>
+                            <span className="text-[11px] text-muted-foreground font-mono">
                               {stat.activityCount} snapshots
                             </span>
                           </div>
                         </div>
 
                         {/* Progress bar */}
-                        <div style={{ height: '5px', background: 'rgba(255,255,255,0.06)', borderRadius: '99px', overflow: 'hidden' }}>
+                        <div className="h-[5px] bg-muted rounded-full overflow-hidden">
                           <motion.div
                             initial={{ width: 0 }}
                             animate={{ width: `${progressPct}%` }}
@@ -242,10 +235,10 @@ export default function SessionReportPage() {
                         </div>
 
                         <div style={{ display: 'flex', gap: '14px', marginTop: '6px' }}>
-                          <span style={{ fontSize: '10px', color: 'rgba(100,116,139,0.7)' }}>
+                          <span className="text-[10px] text-muted-foreground">
                             Active: <span style={{ color: '#34D399' }}>{formatDuration(stat.activeTimeMs)}</span>
                           </span>
-                          <span style={{ fontSize: '10px', color: 'rgba(100,116,139,0.7)' }}>
+                          <span className="text-[10px] text-muted-foreground">
                             Idle: <span style={{ color: '#FBBF24' }}>{formatDuration(stat.idleTimeMs)}</span>
                           </span>
                         </div>
@@ -263,11 +256,11 @@ export default function SessionReportPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3, duration: 0.35 }}
-              style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '18px', overflow: 'hidden' }}
+              className="bg-card/70 border border-border rounded-2xl overflow-hidden"
             >
-              <div style={{ padding: '18px 22px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div className="px-[22px] py-[18px] border-b border-border/60 flex items-center gap-2.5">
                 <BarChart2 size={16} color="#FBBF24" />
-                <span style={{ fontSize: '14px', fontWeight: 700, color: '#e2e8f0' }}>Engagement Distribution</span>
+                <span className="text-[14px] font-bold text-foreground">Engagement Distribution</span>
               </div>
 
               <div style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -280,12 +273,12 @@ export default function SessionReportPage() {
                     return (
                       <div key={stat.userId}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
-                          <span style={{ fontSize: '12px', color: 'rgba(148,163,184,0.85)', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          <span className="text-[12px] text-muted-foreground" style={{ maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {stat.userName}
                           </span>
                           <span style={{ fontSize: '11px', fontWeight: 700, color: eng.color }}>{pct}%</span>
                         </div>
-                        <div style={{ height: '8px', background: 'rgba(255,255,255,0.05)', borderRadius: '99px', overflow: 'hidden' }}>
+                        <div className="h-2 bg-muted rounded-full overflow-hidden">
                           <motion.div
                             initial={{ width: 0 }}
                             animate={{ width: `${pct}%` }}
@@ -299,7 +292,7 @@ export default function SessionReportPage() {
               </div>
 
               {/* Legend */}
-              <div style={{ padding: '14px 22px', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+              <div className="px-[22px] py-3.5 border-t border-border/60 flex gap-4 flex-wrap">
                 {[
                   { label: 'Active', color: '#34D399' },
                   { label: 'Moderate', color: '#FBBF24' },
@@ -307,7 +300,7 @@ export default function SessionReportPage() {
                 ].map((l) => (
                   <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: l.color }} />
-                    <span style={{ fontSize: '11px', color: 'rgba(100,116,139,0.8)' }}>{l.label}</span>
+                    <span className="text-[11px] text-muted-foreground">{l.label}</span>
                   </div>
                 ))}
               </div>

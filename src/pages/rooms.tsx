@@ -54,6 +54,7 @@ export default function Room() {
   const [selectedParticipantId, setSelectedParticipantId] = useState<string>('');
   const [activityMap, setActivityMap] = useState<Record<string, ActivitySnapshot>>({});
   const [isReplayMode, setIsReplayMode] = useState(false);
+  const [cursorPositions, setCursorPositions] = useState<Record<string, { lineNumber: number; column: number; name: string }>>({}); // track where each participant's cursor is
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const outputEndRef = useRef<HTMLDivElement>(null);
@@ -133,7 +134,20 @@ export default function Room() {
   const handleEditorDidMount = (editor: any, monaco: any) => {
     editorRef.current = editor;
     monacoRef.current = monaco;
-    // No activity emissions on focus, mouse, key, or cursor movements to avoid false positives.
+    // Emit cursor position when it changes so other participants can see your line
+    editor.onDidChangeCursorPosition((e: any) => {
+      if (!roomId || !user?.id || !user?.name || isRemoteUpdate.current) return;
+      socket.emit('cursor-change', {
+        roomId,
+        cursorData: {
+          userId: user.id,
+          name: user.name,
+          lineNumber: e.position.lineNumber,
+          column: e.position.column,
+          color: user.avatarColor || '#4F46E5',
+        },
+      });
+    });
   };
 
   const queueCodeEmit = (nextCode: string) => {
@@ -165,7 +179,20 @@ export default function Room() {
           if (model) { isRemoteUpdate.current = true; editorRef.current.executeEdits('remote-sync', [{ range: model.getFullModelRange(), text: newCode, forceMoveMarkers: true }]); updateCode(newCode); isRemoteUpdate.current = false; }
         }
       });
-      socket.on('cursor-update', (cursorData: any) => { if (cursorData.userId !== user.id) handleRemoteCursorUpdate(cursorData); });
+      socket.on('cursor-update', (cursorData: any) => {
+        if (cursorData.userId !== user.id) {
+          handleRemoteCursorUpdate(cursorData);
+          // Track cursor positions for the teacher panel
+          setCursorPositions((prev) => ({
+            ...prev,
+            [cursorData.userId]: {
+              lineNumber: cursorData.lineNumber,
+              column: cursorData.column,
+              name: cursorData.name,
+            },
+          }));
+        }
+      });
       socket.on('participants-updated', ({ participants }: any) => setActiveParticipants(participants));
       socket.on('activity-update', (payload: any) => {
         if (payload?.roomId !== roomId) return;
@@ -455,7 +482,7 @@ export default function Room() {
 
         {/* Left */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <button onClick={handleLeave} style={{ width: '30px', height: '30px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(241,245,249,0.4)', background: 'transparent', border: 'none', cursor: 'pointer', transition: 'all 0.15s' }} className="hover:text-white hover:bg-white/[0.06]">
+          <button onClick={handleLeave} className="w-[30px] h-[30px] rounded-lg flex items-center justify-center text-muted-foreground bg-transparent border-none cursor-pointer transition-all duration-150 hover:text-foreground hover:bg-muted/60">
             <ChevronLeft size={18} />
           </button>
           <div style={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
@@ -463,8 +490,8 @@ export default function Room() {
               <Code2 size={15} color="white" />
             </div>
             <div>
-              <div style={{ fontSize: '13px', fontWeight: 600, lineHeight: 1 }} className="text-foreground">{currentRoom?.name || 'Coding Room'}</div>
-              <button onClick={handleCopyRoomId} className="text-muted-foreground/50 hover:text-muted-foreground bg-transparent border-none cursor-pointer flex items-center gap-1 font-mono p-0 mt-0.5 transition-colors duration-150" style={{ fontSize: '11px' }}>
+              <div className="text-[13px] font-semibold leading-none text-foreground">{currentRoom?.name || 'Coding Room'}</div>
+              <button onClick={handleCopyRoomId} className="text-muted-foreground/60 hover:text-muted-foreground bg-transparent border-none cursor-pointer flex items-center gap-1 font-mono p-0 mt-0.5 transition-colors duration-150 text-[11px]">
                 {roomId?.slice(0, 16)}… {copied ? <Check size={11} color="#34D399" /> : <Copy size={11} />}
               </button>
             </div>
@@ -475,7 +502,7 @@ export default function Room() {
             {isConnected ? 'Live' : 'Offline'}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ padding: '3px 8px', borderRadius: '99px', fontSize: '11px', fontWeight: 600, border: '1px solid rgba(255,255,255,0.08)', background: isEditorLocked ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.05)', color: isEditorLocked ? '#FCA5A5' : 'rgba(241,245,249,0.7)' }}>
+            <span className="px-2 py-[3px] rounded-full text-[11px] font-semibold border" style={{ borderColor: isEditorLocked ? 'rgba(239,68,68,0.25)' : 'hsl(var(--border))', background: isEditorLocked ? 'rgba(239,68,68,0.12)' : 'hsl(var(--muted) / 0.5)', color: isEditorLocked ? '#EF4444' : 'hsl(var(--muted-foreground))' }}>
               {isEditorLocked ? 'Practice Disabled' : 'Practice Enabled'}
             </span>
           </div>
@@ -486,20 +513,20 @@ export default function Room() {
           {/* Participant avatars */}
           <div className="hidden sm:flex" style={{ alignItems: 'center', marginRight: '4px' }}>
             {participants.slice(0, 5).map((p, i) => (
-              <div key={p.id} title={p.name} style={{ width: '26px', height: '26px', borderRadius: '50%', background: p.avatarColor, border: '2px solid #0D1117', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 700, color: '#fff', marginLeft: i > 0 ? '-7px' : 0, zIndex: 5 - i, position: 'relative' }}>
+              <div key={p.id} title={p.name} className="border-2 border-card" style={{ width: '26px', height: '26px', borderRadius: '50%', background: p.avatarColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 700, color: '#fff', marginLeft: i > 0 ? '-7px' : 0, zIndex: 5 - i, position: 'relative' }}>
                 {p.name.charAt(0).toUpperCase()}
-                {p.isOnline && <span style={{ position: 'absolute', bottom: '-1px', right: '-1px', width: '7px', height: '7px', borderRadius: '50%', background: '#10B981', border: '1.5px solid #0D1117' }} />}
+                {p.isOnline && <span className="border-[1.5px] border-card" style={{ position: 'absolute', bottom: '-1px', right: '-1px', width: '7px', height: '7px', borderRadius: '50%', background: '#10B981' }} />}
               </div>
             ))}
-            {participants.length > 5 && <span style={{ fontSize: '11px', color: '#6B7280', marginLeft: '7px' }}>+{participants.length - 5}</span>}
+            {participants.length > 5 && <span className="text-[11px] text-muted-foreground ml-[7px]">+{participants.length - 5}</span>}
           </div>
 
           {/* Language selector */}
           <Select value={language} onValueChange={(v) => { setLanguage(v as 'javascript' | 'python'); socket.emit('language-change', { roomId, language: v, userId: user?.id, userName: user?.name }); }}>
-            <SelectTrigger style={{ width: '130px', height: '32px', fontSize: '12px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', color: '#f1f5f9' }}>
+            <SelectTrigger className="w-[130px] h-8 text-[12px] bg-muted/50 border border-border text-foreground">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.1)' }}>
+            <SelectContent className="bg-card border border-border">
               <SelectItem value="javascript">JavaScript</SelectItem>
               <SelectItem value="python">Python</SelectItem>
             </SelectContent>
@@ -514,8 +541,7 @@ export default function Room() {
             <>
               <button
                 onClick={handleToggleLock}
-                style={{ height: '32px', padding: '0 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.04)', color: '#E2E8F0', border: '1px solid rgba(255,255,255,0.09)', cursor: 'pointer', transition: 'all 0.15s' }}
-                className="hover:text-white hover:border-white/20 hover:bg-white/[0.07]"
+                className="h-8 px-3 rounded-lg text-[12px] font-semibold flex items-center gap-1.5 bg-muted/50 text-foreground border border-border cursor-pointer transition-all duration-150 hover:bg-muted hover:border-border"
               >
                 {isEditorLocked ? <Unlock size={13} /> : <Lock size={13} />}
                 {isEditorLocked ? 'Enable Practice' : 'Disable Practice'}
@@ -523,11 +549,11 @@ export default function Room() {
               <select
                 value={selectedParticipantId}
                 onChange={(e) => setSelectedParticipantId(e.target.value)}
-                style={{ height: '32px', minWidth: '170px', padding: '0 10px', borderRadius: '8px', fontSize: '12px', fontWeight: 500, background: 'rgba(255,255,255,0.04)', color: '#E2E8F0', border: '1px solid rgba(255,255,255,0.09)', outline: 'none' }}
+                className="h-8 min-w-[170px] px-2.5 rounded-lg text-[12px] font-medium bg-muted/50 text-foreground border border-border outline-none"
               >
-                <option value="" style={{ background: '#0D1117', color: '#94A3B8' }}>Select participant</option>
+                <option value="" className="bg-card text-muted-foreground">Select participant</option>
                 {removableParticipants.map((participant) => (
-                  <option key={participant.id} value={participant.id} style={{ background: '#0D1117', color: '#E2E8F0' }}>
+                  <option key={participant.id} value={participant.id} className="bg-card text-foreground">
                     {participant.name}
                   </option>
                 ))}
@@ -535,9 +561,9 @@ export default function Room() {
               <button
                 onClick={handleRemoveParticipant}
                 disabled={!selectedParticipantId}
-                style={{ height: '32px', padding: '0 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, display: 'flex', alignItems: 'center', background: 'rgba(239,68,68,0.18)', color: '#FCA5A5', border: '1px solid rgba(239,68,68,0.35)', cursor: selectedParticipantId ? 'pointer' : 'not-allowed', opacity: selectedParticipantId ? 1 : 0.55, transition: 'all 0.15s' }}
+                style={{ height: '32px', padding: '0 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, display: 'flex', alignItems: 'center', background: 'rgba(239,68,68,0.12)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.25)', cursor: selectedParticipantId ? 'pointer' : 'not-allowed', opacity: selectedParticipantId ? 1 : 0.55, transition: 'all 0.15s' }}
               >
-                Remove Participant
+                Remove
               </button>
             </>
           )}
@@ -546,8 +572,11 @@ export default function Room() {
           <button
             id="session-replay-btn"
             onClick={() => { setIsReplayMode((r) => !r); setIsOutputOpen(false); }}
-            style={{ height: '32px', padding: '0 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', background: isReplayMode ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.04)', color: isReplayMode ? '#818CF8' : 'rgba(241,245,249,0.6)', border: `1px solid ${isReplayMode ? 'rgba(99,102,241,0.4)' : 'rgba(255,255,255,0.09)'}`, cursor: 'pointer', transition: 'all 0.15s' }}
-            className="hover:text-white hover:border-white/20 hover:bg-white/[0.07]"
+            className={`h-8 px-3 rounded-lg text-[12px] font-semibold flex items-center gap-1.5 border cursor-pointer transition-all duration-150 ${
+              isReplayMode
+                ? 'bg-primary/15 text-primary border-primary/35 hover:bg-primary/20'
+                : 'bg-muted/50 text-muted-foreground border-border hover:bg-muted hover:text-foreground'
+            }`}
           >
             <History size={13} />
             <span className="hidden sm:inline">{isReplayMode ? 'Exit Replay' : 'Replay'}</span>
@@ -557,8 +586,7 @@ export default function Room() {
           <button
             id="session-report-btn"
             onClick={() => navigate(`/rooms/${roomId}/report`)}
-            style={{ height: '32px', padding: '0 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.04)', color: 'rgba(241,245,249,0.6)', border: '1px solid rgba(255,255,255,0.09)', cursor: 'pointer', transition: 'all 0.15s' }}
-            className="hover:text-white hover:border-white/20 hover:bg-white/[0.07]"
+            className="h-8 px-3 rounded-lg text-[12px] font-semibold flex items-center gap-1.5 bg-muted/50 text-muted-foreground border border-border cursor-pointer transition-all duration-150 hover:bg-muted hover:text-foreground"
           >
             <FileBarChart2 size={13} />
             <span className="hidden sm:inline">Report</span>
@@ -575,8 +603,7 @@ export default function Room() {
 
           {/* Save */}
           <button onClick={handleSaveCode}
-            style={{ height: '32px', padding: '0 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.04)', color: 'rgba(241,245,249,0.6)', border: '1px solid rgba(255,255,255,0.09)', cursor: 'pointer', transition: 'all 0.15s' }}
-            className="hover:text-white hover:border-white/20 hover:bg-white/[0.07]"
+            className="h-8 px-3 rounded-lg text-[12px] font-medium flex items-center gap-1.5 bg-muted/50 text-muted-foreground border border-border cursor-pointer transition-all duration-150 hover:bg-muted hover:text-foreground"
           >
             <Save size={13} />
             <span className="hidden sm:inline">Save</span>
@@ -584,7 +611,11 @@ export default function Room() {
 
           {/* Chat toggle */}
           <button onClick={() => setIsChatOpen(!isChatOpen)}
-            style={{ height: '32px', width: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', border: isChatOpen ? '1px solid rgba(99,102,241,0.4)' : '1px solid rgba(255,255,255,0.09)', background: isChatOpen ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.04)', color: isChatOpen ? '#818CF8' : 'rgba(241,245,249,0.45)', cursor: 'pointer', transition: 'all 0.15s' }}
+            className={`h-8 w-8 rounded-lg flex items-center justify-center relative border cursor-pointer transition-all duration-150 ${
+              isChatOpen
+                ? 'bg-primary/15 border-primary/35 text-primary'
+                : 'bg-muted/50 border-border text-muted-foreground hover:bg-muted hover:text-foreground'
+            }`}
           >
             <MessageCircle size={15} />
             {allMessages.length > 0 && !isChatOpen && (
@@ -594,7 +625,7 @@ export default function Room() {
             )}
           </button>
 
-          <button className="sm:hidden" style={{ height: '32px', width: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', color: 'rgba(241,245,249,0.45)', cursor: 'pointer' }}>
+          <button className="sm:hidden h-8 w-8 rounded-lg flex items-center justify-center bg-muted/50 border border-border text-muted-foreground cursor-pointer">
             <Users size={15} />
           </button>
         </div>
@@ -622,17 +653,17 @@ export default function Room() {
               >
                 <div style={{ padding: '14px 14px 12px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px' }} className="border-b border-border/50">
                   <div>
-                    <div style={{ fontSize: '13px', fontWeight: 700, color: '#f8fafc', letterSpacing: '-0.01em' }}>Live Classroom Intelligence</div>
-                    <div style={{ fontSize: '11px', color: 'rgba(148,163,184,0.82)', marginTop: '3px' }}>Teacher-only engagement signal</div>
+                    <div className="text-[13px] font-bold text-foreground" style={{ letterSpacing: '-0.01em' }}>Live Classroom Intelligence</div>
+                    <div className="text-[11px] text-muted-foreground mt-[3px]">Teacher-only engagement signal</div>
                   </div>
-                  <span style={{ fontSize: '10px', fontWeight: 700, color: '#93C5FD', background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.18)', padding: '4px 8px', borderRadius: '999px' }}>
+                  <span style={{ fontSize: '10px', fontWeight: 700, color: '#3B82F6', background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.18)', padding: '4px 8px', borderRadius: '999px' }}>
                     {classroomParticipants.length} students
                   </span>
                 </div>
 
                 <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '340px', overflowY: 'auto' }}>
                   {classroomParticipants.length === 0 ? (
-                    <div style={{ padding: '22px 12px', textAlign: 'center', color: 'rgba(148,163,184,0.75)', fontSize: '12px' }}>
+                    <div className="py-5 px-3 text-center text-muted-foreground text-[12px]">
                       Waiting for participants to join.
                     </div>
                   ) : (
@@ -640,6 +671,7 @@ export default function Room() {
                       const snapshot = activityMap[participant.id];
                       const status = snapshot?.status || 'inactive';
                       const state = activityPalette[status];
+                      const cursorPos = cursorPositions[participant.id];
 
                       return (
                         <motion.div
@@ -649,22 +681,30 @@ export default function Room() {
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: 6 }}
                           transition={{ duration: 0.18, ease: 'easeOut' }}
-                          style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 11px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.03)' }}
+                          className="border border-border/60 bg-muted/30"
+                          style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 11px', borderRadius: '14px' }}
                         >
-                          <div style={{ position: 'relative', width: '38px', height: '38px', borderRadius: '50%', background: participant.avatarColor, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 700, flexShrink: 0 }}>
+                          <div className="border-2 border-card" style={{ position: 'relative', width: '38px', height: '38px', borderRadius: '50%', background: participant.avatarColor, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 700, flexShrink: 0 }}>
                             {participant.name.charAt(0).toUpperCase()}
-                            <span style={{ position: 'absolute', right: '-1px', bottom: '-1px', width: '11px', height: '11px', borderRadius: '50%', background: state.dot, border: '2px solid #020617' }} className={state.glow} />
+                            <span className={state.glow} style={{ position: 'absolute', right: '-1px', bottom: '-1px', width: '11px', height: '11px', borderRadius: '50%', background: state.dot, border: '2px solid hsl(var(--card))' }} />
                           </div>
 
                           <div style={{ minWidth: 0, flex: 1 }}>
-                            <div style={{ fontSize: '13px', fontWeight: 600, color: '#e2e8f0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              {participant.name}
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="text-[13px] font-semibold text-foreground" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {participant.name}
+                              </div>
+                              {cursorPos && (
+                                <span className="text-[10px] font-mono font-semibold text-primary shrink-0" style={{ background: 'hsl(var(--primary) / 0.1)', padding: '2px 6px', borderRadius: '6px', border: '1px solid hsl(var(--primary) / 0.2)' }}>
+                                  Ln {cursorPos.lineNumber}
+                                </span>
+                              )}
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '7px', marginTop: '4px', flexWrap: 'wrap' }}>
-                              <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.02em', color: state.dot, background: state.badge, border: '1px solid rgba(255,255,255,0.05)', padding: '3px 8px', borderRadius: '999px' }}>
+                              <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.02em', color: state.dot, background: state.badge, padding: '3px 8px', borderRadius: '999px' }} className="border border-border/50">
                                 {state.label}
                               </span>
-                              <span style={{ fontSize: '10px', color: 'rgba(148,163,184,0.78)' }}>
+                              <span className="text-[10px] text-muted-foreground">
                                 {snapshot ? formatLastActive(snapshot.lastActive) : 'No recent activity'}
                               </span>
                             </div>
@@ -762,16 +802,14 @@ export default function Room() {
                           setTimeout(() => setOutputCopied(false), 2000);
                         }}
                         title="Copy output"
-                        style={{ height: '22px', padding: '0 8px', borderRadius: '5px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', fontWeight: 500, color: 'rgba(255,255,255,0.3)', background: 'transparent', border: '1px solid rgba(255,255,255,0.07)', cursor: 'pointer', transition: 'all 0.15s' }}
-                        className="hover:text-white/60 hover:border-white/20"
+                        className="h-[22px] px-2 rounded-[5px] flex items-center gap-1 text-[10px] font-medium text-muted-foreground bg-transparent border border-border cursor-pointer transition-all duration-150 hover:text-foreground hover:border-border"
                       >
                         {outputCopied ? <Check size={10} color="#34D399" /> : <Copy size={10} />}
                         {outputCopied ? 'Copied' : 'Copy'}
                       </button>
                     )}
                     <button onClick={() => setIsOutputOpen(false)}
-                      style={{ width: '22px', height: '22px', borderRadius: '5px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.25)', background: 'transparent', border: 'none', cursor: 'pointer', transition: 'all 0.15s' }}
-                      className="hover:text-white/60 hover:bg-white/[0.05]"
+                      className="w-[22px] h-[22px] rounded-[5px] flex items-center justify-center text-muted-foreground bg-transparent border-none cursor-pointer transition-all duration-150 hover:text-foreground hover:bg-muted/50"
                     >
                       <X size={12} />
                     </button>
@@ -810,9 +848,9 @@ export default function Room() {
                               lineHeight: 1.6,
                             }}
                           >
-                            <span style={{ color: '#64748B' }}>[{entry.timestamp}]</span>
+                            <span className="text-muted-foreground">[{entry.timestamp}]</span>
                             <span style={{ color: metaColor, fontWeight: 700 }}>{label}</span>
-                            <span style={{ color: textColor, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{entry.message}</span>
+                            <span className={entry.level === 'stderr' || entry.level === 'error' ? 'text-red-300' : 'text-foreground'} style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{entry.message}</span>
                           </div>
                         );
                       })}
@@ -820,9 +858,9 @@ export default function Room() {
                     </div>
                   ) : (
                     /* Initial idle state */
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#374151', fontFamily: 'JetBrains Mono, monospace', fontSize: '12px' }}>
+                    <div className="flex items-center gap-2 text-muted-foreground font-mono text-[12px]">
                       <span style={{ color: '#34D399' }}>$</span>
-                      <span>Press <strong style={{ color: 'rgba(255,255,255,0.4)' }}>Run</strong> to execute your code…</span>
+                      <span>Press <strong className="text-foreground/60">Run</strong> to execute your code…</span>
                     </div>
                   )}
                 </div>
@@ -840,13 +878,13 @@ export default function Room() {
               {/* Chat header */}
               <div className="py-3 px-4 border-b border-border/50 flex items-center justify-between shrink-0">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <MessageCircle size={15} color="#818CF8" />
-                  <span style={{ fontWeight: 600, color: '#f1f5f9', fontSize: '13px' }}>Team Chat</span>
+                  <MessageCircle size={15} className="text-primary" />
+                  <span className="font-semibold text-foreground text-[13px]">Team Chat</span>
                   {allMessages.length > 0 && (
-                    <span style={{ fontSize: '10px', padding: '2px 7px', borderRadius: '99px', background: 'rgba(99,102,241,0.15)', color: '#a5b4fc', fontWeight: 600 }}>{allMessages.length}</span>
+                    <span className="text-[10px] px-[7px] py-[2px] rounded-full bg-primary/15 text-primary font-semibold">{allMessages.length}</span>
                   )}
                 </div>
-                <button onClick={() => setIsChatOpen(false)} style={{ width: '26px', height: '26px', borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.3)', background: 'transparent', border: 'none', cursor: 'pointer', transition: 'all 0.15s' }} className="hover:text-white/70 hover:bg-white/[0.05]">
+                <button onClick={() => setIsChatOpen(false)} className="w-[26px] h-[26px] rounded-[7px] flex items-center justify-center text-muted-foreground bg-transparent border-none cursor-pointer transition-all duration-150 hover:text-foreground hover:bg-muted/50">
                   <X size={14} />
                 </button>
               </div>
@@ -855,9 +893,9 @@ export default function Room() {
               <div style={{ flex: 1, overflowY: 'auto', padding: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {allMessages.length === 0 ? (
                   <div style={{ textAlign: 'center', paddingTop: '48px' }}>
-                    <MessageCircle size={32} color="rgba(255,255,255,0.08)" style={{ margin: '0 auto 10px' }} />
-                    <p style={{ fontSize: '13px', color: '#4B5563' }}>No messages yet</p>
-                    <p style={{ fontSize: '12px', color: '#374151', marginTop: '4px' }}>Start the conversation!</p>
+                    <MessageCircle size={32} className="text-muted-foreground/20 mx-auto mb-2.5" />
+                    <p className="text-[13px] text-muted-foreground">No messages yet</p>
+                    <p className="text-[12px] text-muted-foreground/70 mt-1">Start the conversation!</p>
                   </div>
                 ) : allMessages.map((msg) => {
                   const isOwn = msg.userId === user?.id;
@@ -870,10 +908,11 @@ export default function Room() {
                       </div>
                       <div style={{ maxWidth: '75%', display: 'flex', flexDirection: 'column', gap: '3px', alignItems: isOwn ? 'flex-end' : 'flex-start' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                          {!isOwn && <span style={{ fontSize: '10px', fontWeight: 600, color: 'rgba(241,245,249,0.5)' }}>{msg.userName}</span>}
-                          <span style={{ fontSize: '10px', color: '#374151' }}>{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                          {!isOwn && <span className="text-[10px] font-semibold text-muted-foreground">{msg.userName}</span>}
+                          <span className="text-[10px] text-muted-foreground/70">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                         </div>
-                        <div style={{ padding: '8px 12px', borderRadius: isOwn ? '14px 14px 4px 14px' : '14px 14px 14px 4px', fontSize: '13px', lineHeight: 1.5, background: isOwn ? 'rgba(99,102,241,0.18)' : 'rgba(255,255,255,0.05)', border: isOwn ? '1px solid rgba(99,102,241,0.28)' : '1px solid rgba(255,255,255,0.07)', color: isOwn ? '#c7d2fe' : 'rgba(241,245,249,0.85)' }}>
+                        <div className={isOwn ? 'bg-primary/15 border border-primary/25 text-foreground' : 'bg-muted/50 border border-border text-foreground'}
+                          style={{ padding: '8px 12px', borderRadius: isOwn ? '14px 14px 4px 14px' : '14px 14px 14px 4px', fontSize: '13px', lineHeight: 1.5 }}>
                           {msg.content}
                         </div>
                       </div>
@@ -884,14 +923,13 @@ export default function Room() {
               </div>
 
               {/* Input */}
-              <div style={{ padding: '10px', borderTop: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
+              <div className="p-2.5 border-t border-border shrink-0">
                 <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} style={{ display: 'flex', gap: '8px' }}>
                   <input placeholder="Type a message…" value={newMessage} onChange={(e) => setNewMessage(e.target.value)}
-                    style={{ flex: 1, padding: '9px 12px', borderRadius: '10px', fontSize: '13px', color: '#f1f5f9', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', outline: 'none', transition: 'all 0.15s', fontFamily: 'Inter, system-ui, sans-serif' }}
-                    className="placeholder:text-white/25 focus:border-indigo-500/50 focus:bg-white/[0.06]"
+                    className="flex-1 py-[9px] px-3 rounded-[10px] text-[13px] text-foreground bg-muted/50 border border-border outline-none transition-all duration-150 font-sans placeholder:text-muted-foreground/40 focus:border-primary/50 focus:bg-muted"
                   />
                   <button type="submit" disabled={!newMessage.trim()}
-                    style={{ width: '36px', height: '36px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: newMessage.trim() ? '#4F46E5' : 'rgba(255,255,255,0.04)', border: 'none', cursor: newMessage.trim() ? 'pointer' : 'not-allowed', opacity: newMessage.trim() ? 1 : 0.4, transition: 'all 0.15s', flexShrink: 0 }}
+                    style={{ width: '36px', height: '36px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: newMessage.trim() ? '#4F46E5' : 'hsl(var(--muted))', border: 'none', cursor: newMessage.trim() ? 'pointer' : 'not-allowed', opacity: newMessage.trim() ? 1 : 0.4, transition: 'all 0.15s', flexShrink: 0 }}
                   >
                     <Send size={14} color="white" />
                   </button>
