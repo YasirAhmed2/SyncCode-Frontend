@@ -2,20 +2,21 @@
 
 import axios from "axios";
 
-// Determine API base URL: use env var, fallback to localhost in dev, production URL in production
+const DEFAULT_BACKEND_URL = "http://64.227.151.216:5000";
+
+const normalizeBaseUrl = (rawUrl: string) => {
+  const withProtocol = /^https?:\/\//i.test(rawUrl) ? rawUrl : `http://${rawUrl}`;
+  return withProtocol.replace(/\/$/, "");
+};
+
+// Determine API base URL from env first, then fallback to the configured backend IP.
 const getAPIBaseURL = () => {
-  // 1. If VITE_API_BASE_URL is explicitly set, use it
-  if (import.meta.env.VITE_API_BASE_URL) {
-    return import.meta.env.VITE_API_BASE_URL;
+  const configuredUrl = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL;
+  if (configuredUrl) {
+    return normalizeBaseUrl(configuredUrl);
   }
 
-  // 2. In development mode, use localhost:8080
-  if (import.meta.env.DEV) {
-    return "http://localhost:8080";
-  }
-
-  // 3. In production, use the deployed backend
-  return "https://synccode-backend-production.up.railway.app";
+  return DEFAULT_BACKEND_URL;
 };
 
 const API_BASE_URL = getAPIBaseURL();

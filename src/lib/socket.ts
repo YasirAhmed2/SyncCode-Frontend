@@ -1,16 +1,20 @@
 import { io } from 'socket.io-client';
 
-// Determine Socket.IO URL: use env var, fallback to localhost in dev, production URL in production
+const DEFAULT_SOCKET_URL = 'http://64.227.151.216:5000';
+
+const normalizeBaseUrl = (rawUrl: string) => {
+  const withProtocol = /^https?:\/\//i.test(rawUrl) ? rawUrl : `http://${rawUrl}`;
+  return withProtocol.replace(/\/$/, '');
+};
+
+// Determine Socket.IO URL from env first, then fallback to the configured backend IP.
 const getSocketURL = () => {
-  if (import.meta.env.VITE_API_BASE_URL) {
-    return import.meta.env.VITE_API_BASE_URL;
+  const configuredUrl = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL;
+  if (configuredUrl) {
+    return normalizeBaseUrl(configuredUrl);
   }
 
-  if (import.meta.env.DEV) {
-    return 'http://localhost:8080';
-  }
-
-  return 'https://synccode-backend-production.up.railway.app';
+  return DEFAULT_SOCKET_URL;
 };
 
 const SOCKET_URL = getSocketURL();
