@@ -28,10 +28,12 @@ export const roomService = {
     roomId: string;
     code: string;
     language: string;
+    yjsState?: string;
   }) => {
     const res = await api.put(`/rooms/${data.roomId}/code/save`, {
       code: data.code,
       language: data.language,
+      yjsState: data.yjsState,
     });
     return res.data;
   },

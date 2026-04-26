@@ -2,6 +2,9 @@ import { socket } from '../lib/socket.ts';
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Editor from '@monaco-editor/react';
+import * as Y from 'yjs';
+import { Awareness, applyAwarenessUpdate, encodeAwarenessUpdate } from 'y-protocols/awareness';
+import { MonacoBinding } from 'y-monaco';
 import { useAuth } from '../context/auth.context';
 import { useRoom } from '../context/room.context';
 import { useTheme } from '../context/theme.context';
@@ -12,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { roomService } from '../lib/roomService';
 import { executionService } from '../lib/executionService';
 import { ThemeToggle } from '../components/theme-toggle';
+import { CODE_FIELD, encodeYDocState, normalizeBinaryUpdate } from '../lib/yjs';
 
 interface Message { id: string; userId: string; userName: string; content: string; timestamp: string; }
 type ActivityStatus = 'active' | 'idle' | 'inactive';
@@ -24,6 +28,9 @@ interface ActivitySnapshot {
 type TerminalLevel = 'info' | 'stdout' | 'stderr' | 'error' | 'system';
 interface TerminalEntry { id: string; level: TerminalLevel; message: string; timestamp: string; }
 interface NormalizedExecutionResult { stdout: string; stderr: string; exitCode: number | null; }
+
+const REMOTE_SYNC_ORIGIN = 'socket-remote';
+const INITIAL_SYNC_ORIGIN = 'socket-init';
 
 export default function Room() {
   const { roomId } = useParams<{ roomId: string }>();
@@ -50,6 +57,7 @@ export default function Room() {
   );
   const [isEditorLocked, setIsEditorLocked] = useState<boolean>(Boolean(currentRoom?.isLocked));
   const [teacherId, setTeacherId] = useState<string | null>(currentRoom?.teacherId || null);
+  const [roomMode, setRoomMode] = useState<'broadcast' | 'practice'>(currentRoom?.mode === 'practice' ? 'practice' : 'broadcast');
   const [selectedParticipantId, setSelectedParticipantId] = useState<string>('');
   const [activityMap, setActivityMap] = useState<Record<string, ActivitySnapshot>>({});
   const [cursorPositions, setCursorPositions] = useState<Record<string, { lineNumber: number; column: number; name: string }>>({}); // track where each participant's cursor is
@@ -59,16 +67,17 @@ export default function Room() {
   const outputEndRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<any>(null);
   const monacoRef = useRef<any>(null);
-  const isRemoteUpdate = useRef(false);
-  const cursorDecorations = useRef<Map<string, string[]>>(new Map());
+  const ydocRef = useRef<Y.Doc | null>(null);
+  const yTextRef = useRef<Y.Text | null>(null);
+  const awarenessRef = useRef<Awareness | null>(null);
+  const bindingRef = useRef<MonacoBinding | null>(null);
   const isJoiningRoom = useRef(false); // guard against re-entrant joinRoom calls
-  const pendingEmitCodeRef = useRef<string | null>(null);
-  const emitCodeTimerRef = useRef<number | null>(null);
   const typingStopTimerRef = useRef<number | null>(null);
   const typingResetTimersRef = useRef<Record<string, number>>({});
+  const awarenessTypingTimerRef = useRef<number | null>(null);
 
   const isTeacher = Boolean(user?.id && teacherId && user.id === teacherId);
-  const isStudentReadOnly = !isTeacher && isEditorLocked;
+  const isStudentReadOnly = !isTeacher && (isEditorLocked || roomMode === 'broadcast');
   const isEditorReadOnly = isStudentReadOnly;
 
   const normalizeMessage = (raw: any): Message => ({
@@ -114,119 +123,187 @@ export default function Room() {
     return `${minutes}m ago`;
   };
 
-  const handleRemoteCursorUpdate = (remoteCursor: any) => {
-    if (!editorRef.current || !monacoRef.current) return;
-    const monaco = monacoRef.current;
-    const editor = editorRef.current;
-    const oldDecorations = cursorDecorations.current.get(remoteCursor.userId) || [];
-    const newDecorations = [{ range: new monaco.Range(remoteCursor.lineNumber, remoteCursor.column, remoteCursor.lineNumber, remoteCursor.column + 1), options: { className: `remote-cursor-${remoteCursor.userId}`, beforeContentClassName: `remote-cursor-widget-${remoteCursor.userId}`, stickiness: monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges, hoverMessage: { value: remoteCursor.name } } }];
-    if (!document.getElementById(`style-${remoteCursor.userId}`)) {
-      const style = document.createElement('style');
-      style.id = `style-${remoteCursor.userId}`;
-      style.innerHTML = `.remote-cursor-${remoteCursor.userId}{border-left:2px solid ${remoteCursor.color}!important}.remote-cursor-widget-${remoteCursor.userId}::after{content:'${remoteCursor.name}';position:absolute;top:-18px;left:0;background:${remoteCursor.color};color:white;font-size:10px;padding:0 4px;border-radius:2px;white-space:nowrap;font-weight:bold;pointer-events:none}`;
-      document.head.appendChild(style);
-    }
-    const newIds = editor.deltaDecorations(oldDecorations, newDecorations);
-    cursorDecorations.current.set(remoteCursor.userId, newIds);
+  const syncPresenceFromAwareness = () => {
+    const awareness = awarenessRef.current;
+    if (!awareness) return;
+
+    const nextCursorPositions: Record<string, { lineNumber: number; column: number; name: string }> = {};
+    const nextTypingUsers: Record<string, { name: string }> = {};
+
+    awareness.getStates().forEach((state: any) => {
+      const presenceUser = state?.user;
+      if (!presenceUser?.id) return;
+
+      if (state.cursor && typeof state.cursor.lineNumber === 'number' && typeof state.cursor.column === 'number') {
+        nextCursorPositions[presenceUser.id] = {
+          lineNumber: state.cursor.lineNumber,
+          column: state.cursor.column,
+          name: presenceUser.name || 'Unknown',
+        };
+      }
+
+      if (state.typing && presenceUser.id !== user?.id) {
+        nextTypingUsers[presenceUser.id] = { name: presenceUser.name || 'Unknown' };
+      }
+    });
+
+    setCursorPositions(nextCursorPositions);
+    setTypingUsers(nextTypingUsers);
   };
 
-  const markUserTyping = (typingUserId: string, typingUserName: string) => {
-    if (!typingUserId) return;
+  const refreshLocalPresence = (patch: Record<string, unknown>) => {
+    const awareness = awarenessRef.current;
+    if (!awareness || !user) return;
 
-    setTypingUsers((prev) => ({
-      ...prev,
-      [typingUserId]: { name: typingUserName || prev[typingUserId]?.name || 'Unknown' },
-    }));
+    awareness.setLocalState({
+      ...awareness.getLocalState(),
+      user: {
+        id: user.id,
+        name: user.name,
+        color: user.avatarColor || '#4F46E5',
+      },
+      ...patch,
+    });
+  };
 
-    const existingTimer = typingResetTimersRef.current[typingUserId];
-    if (existingTimer !== undefined) {
-      window.clearTimeout(existingTimer);
+  const setLocalTypingPresence = () => {
+    refreshLocalPresence({ typing: true });
+    if (awarenessTypingTimerRef.current !== null) {
+      window.clearTimeout(awarenessTypingTimerRef.current);
     }
 
-    typingResetTimersRef.current[typingUserId] = window.setTimeout(() => {
-      setTypingUsers((prev) => {
-        if (!prev[typingUserId]) return prev;
-        const next = { ...prev };
-        delete next[typingUserId];
-        return next;
-      });
-      delete typingResetTimersRef.current[typingUserId];
-    }, 2500);
+    awarenessTypingTimerRef.current = window.setTimeout(() => {
+      refreshLocalPresence({ typing: false });
+      awarenessTypingTimerRef.current = null;
+    }, 1500);
+  };
+
+  const bindMonacoToYjs = () => {
+    if (!editorRef.current || !yTextRef.current || !awarenessRef.current) {
+      return;
+    }
+
+    const model = editorRef.current.getModel();
+    if (!model) {
+      return;
+    }
+
+    bindingRef.current?.destroy();
+    bindingRef.current = new MonacoBinding(
+      yTextRef.current,
+      model,
+      new Set([editorRef.current]),
+      awarenessRef.current
+    );
+  };
+
+  const destroyYjsBinding = () => {
+    bindingRef.current?.destroy();
+    bindingRef.current = null;
+    awarenessRef.current?.destroy();
+    awarenessRef.current = null;
+    ydocRef.current?.destroy();
+    ydocRef.current = null;
+    yTextRef.current = null;
   };
 
   const handleEditorDidMount = (editor: any, monaco: any) => {
     editorRef.current = editor;
     monacoRef.current = monaco;
-    // Emit cursor position when it changes so other participants can see your line
+    bindMonacoToYjs();
+
     editor.onDidChangeCursorPosition((e: any) => {
-      if (!roomId || !user?.id || !user?.name || isRemoteUpdate.current) return;
+      if (!roomId || !user?.id || !user?.name) return;
 
-      setCursorPositions((prev) => ({
-        ...prev,
-        [user.id]: {
+      refreshLocalPresence({
+        cursor: {
           lineNumber: e.position.lineNumber,
           column: e.position.column,
-          name: user.name,
-        },
-      }));
-
-      socket.emit('cursor-change', {
-        roomId,
-        cursorData: {
-          userId: user.id,
-          name: user.name,
-          lineNumber: e.position.lineNumber,
-          column: e.position.column,
-          color: user.avatarColor || '#4F46E5',
         },
       });
+      emitUserActivity();
     });
-  };
-
-  const queueCodeEmit = (nextCode: string) => {
-    pendingEmitCodeRef.current = nextCode;
-    if (emitCodeTimerRef.current !== null) {
-      return;
-    }
-
-    emitCodeTimerRef.current = window.setTimeout(() => {
-      const latestCode = pendingEmitCodeRef.current;
-      pendingEmitCodeRef.current = null;
-      emitCodeTimerRef.current = null;
-
-      if (!latestCode) return;
-      socket.emit('code-change', { roomId, code: latestCode, language, userId: user?.id, userName: user?.name, source: "local" });
-    }, 35);
   };
 
   useEffect(() => {
     if (roomId && user) {
+      const ydoc = new Y.Doc();
+      const yText = ydoc.getText(CODE_FIELD);
+      const awareness = new Awareness(ydoc);
+
+      ydocRef.current = ydoc;
+      yTextRef.current = yText;
+      awarenessRef.current = awareness;
+
+      refreshLocalPresence({
+        cursor: null,
+        typing: false,
+      });
+
+      const handleDocUpdate = (update: Uint8Array, origin: unknown) => {
+        updateCode(yText.toString());
+
+        if (origin === REMOTE_SYNC_ORIGIN || origin === INITIAL_SYNC_ORIGIN) {
+          return;
+        }
+
+        socket.emit('yjs-update', { roomId, update });
+        emitTypingActivity();
+        setLocalTypingPresence();
+      };
+
+      const handleAwarenessUpdate = (
+        { added, updated, removed }: { added: number[]; updated: number[]; removed: number[] },
+        origin: unknown
+      ) => {
+        syncPresenceFromAwareness();
+
+        if (origin === REMOTE_SYNC_ORIGIN || origin === INITIAL_SYNC_ORIGIN) {
+          return;
+        }
+
+        const changedClients = [...added, ...updated, ...removed];
+        if (!changedClients.length) return;
+
+        socket.emit('yjs-awareness', {
+          roomId,
+          update: encodeAwarenessUpdate(awareness, changedClients),
+          clientId: awareness.clientID,
+        });
+      };
+
+      ydoc.on('update', handleDocUpdate);
+      awareness.on('update', handleAwarenessUpdate);
+
       socket.auth = { token: localStorage.getItem('token') };
       socket.connect();
       setIsConnected(true);
       socket.emit('join-room', { roomId, userId: user.id, userName: user.name, avatarColor: user.avatarColor || '#4F46E5' });
-      socket.on('code-update', (updateData: any) => {
-        const newCode = typeof updateData === 'string' ? updateData : updateData.code;
-        if (updateData?.changedBy?.userId) {
-          markUserTyping(updateData.changedBy.userId, updateData.changedBy.userName || 'Unknown');
+      socket.on('yjs-init', (payload: any) => {
+        const documentUpdate = normalizeBinaryUpdate(payload?.documentUpdate);
+        if (documentUpdate.length) {
+          Y.applyUpdate(ydoc, documentUpdate, INITIAL_SYNC_ORIGIN);
         }
-        if (editorRef.current && newCode !== editorRef.current.getValue()) {
-          const model = editorRef.current.getModel();
-          if (model) { isRemoteUpdate.current = true; editorRef.current.executeEdits('remote-sync', [{ range: model.getFullModelRange(), text: newCode, forceMoveMarkers: true }]); updateCode(newCode); isRemoteUpdate.current = false; }
+
+        const awarenessUpdate = normalizeBinaryUpdate(payload?.awarenessUpdate);
+        if (awarenessUpdate.length) {
+          applyAwarenessUpdate(awareness, awarenessUpdate, INITIAL_SYNC_ORIGIN);
+          syncPresenceFromAwareness();
+        }
+
+        bindMonacoToYjs();
+      });
+      socket.on('yjs-update', (incomingUpdate: any) => {
+        const normalized = normalizeBinaryUpdate(incomingUpdate);
+        if (normalized.length) {
+          Y.applyUpdate(ydoc, normalized, REMOTE_SYNC_ORIGIN);
         }
       });
-      socket.on('cursor-update', (cursorData: any) => {
-        if (cursorData.userId !== user.id) {
-          handleRemoteCursorUpdate(cursorData);
-          // Track cursor positions for the teacher panel
-          setCursorPositions((prev) => ({
-            ...prev,
-            [cursorData.userId]: {
-              lineNumber: cursorData.lineNumber,
-              column: cursorData.column,
-              name: cursorData.name,
-            },
-          }));
+      socket.on('yjs-awareness', (incomingUpdate: any) => {
+        const normalized = normalizeBinaryUpdate(incomingUpdate);
+        if (normalized.length) {
+          applyAwarenessUpdate(awareness, normalized, REMOTE_SYNC_ORIGIN);
+          syncPresenceFromAwareness();
         }
       });
       socket.on('participants-updated', ({ participants }: any) => {
@@ -282,6 +359,14 @@ export default function Room() {
         if (typeof state?.isLocked === 'boolean') {
           setIsEditorLocked(state.isLocked);
         }
+        if (state?.mode === 'broadcast' || state?.mode === 'practice') {
+          setRoomMode(state.mode);
+        }
+      });
+      socket.on('room-mode-updated', (data: any) => {
+        if (data?.mode === 'broadcast' || data?.mode === 'practice') {
+          setRoomMode(data.mode);
+        }
       });
       socket.on('room-lock-updated', (data: any) => {
         if (typeof data?.isLocked === 'boolean') {
@@ -328,21 +413,25 @@ export default function Room() {
         } as any);
       });
       return () => {
-        socket.off('code-update'); socket.off('cursor-update'); socket.off('language-update'); socket.off('participants-updated'); socket.off('activity-update'); socket.off('user-joined'); socket.off('user-left'); socket.off('room-control-state'); socket.off('room-lock-updated'); socket.off('room-chat-history'); socket.off('chat-message'); socket.off('participant-removed'); socket.off('removed-from-room'); socket.off('session-insights-ready');
-        if (emitCodeTimerRef.current !== null) {
-          window.clearTimeout(emitCodeTimerRef.current);
-          emitCodeTimerRef.current = null;
-        }
+        socket.off('yjs-init'); socket.off('yjs-update'); socket.off('yjs-awareness'); socket.off('language-update'); socket.off('participants-updated'); socket.off('activity-update'); socket.off('user-joined'); socket.off('user-left'); socket.off('room-control-state'); socket.off('room-mode-updated'); socket.off('room-lock-updated'); socket.off('room-chat-history'); socket.off('chat-message'); socket.off('participant-removed'); socket.off('removed-from-room'); socket.off('session-insights-ready');
         if (typingStopTimerRef.current !== null) {
           window.clearTimeout(typingStopTimerRef.current);
           typingStopTimerRef.current = null;
+        }
+        if (awarenessTypingTimerRef.current !== null) {
+          window.clearTimeout(awarenessTypingTimerRef.current);
+          awarenessTypingTimerRef.current = null;
         }
         Object.values(typingResetTimersRef.current).forEach((timerId) => {
           window.clearTimeout(timerId);
         });
         typingResetTimersRef.current = {};
-        pendingEmitCodeRef.current = null;
-        socket.emit('leave-room', { roomId, userId: user.id }); socket.disconnect(); setIsConnected(false);
+        ydoc.off('update', handleDocUpdate);
+        awareness.off('update', handleAwarenessUpdate);
+        socket.emit('leave-room', { roomId, userId: user.id });
+        destroyYjsBinding();
+        socket.disconnect();
+        setIsConnected(false);
       };
     }
   }, [roomId, user]);
@@ -354,6 +443,9 @@ export default function Room() {
     }
     if (typeof currentRoom.isLocked === 'boolean') {
       setIsEditorLocked(currentRoom.isLocked);
+    }
+    if (currentRoom.mode === 'broadcast' || currentRoom.mode === 'practice') {
+      setRoomMode(currentRoom.mode);
     }
   }, [currentRoom]);
 
@@ -375,11 +467,20 @@ export default function Room() {
       window.clearTimeout(typingStopTimerRef.current);
       typingStopTimerRef.current = null;
     }
+    if (awarenessTypingTimerRef.current !== null) {
+      window.clearTimeout(awarenessTypingTimerRef.current);
+      awarenessTypingTimerRef.current = null;
+    }
     Object.values(typingResetTimersRef.current).forEach((timerId) => {
       window.clearTimeout(timerId);
     });
     typingResetTimersRef.current = {};
   }, [roomId]);
+  useEffect(() => {
+    if (editorRef.current) {
+      editorRef.current.updateOptions({ readOnly: isEditorReadOnly });
+    }
+  }, [isEditorReadOnly]);
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
   useEffect(() => { outputEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [terminalEntries, isExecuting]);
 
@@ -501,7 +602,12 @@ export default function Room() {
     try {
       if (!roomId) return;
       const liveCode = editorRef.current ? editorRef.current.getValue() : code;
-      await roomService.saveCode({ roomId, code: liveCode, language });
+      await roomService.saveCode({
+        roomId,
+        code: liveCode,
+        language,
+        yjsState: ydocRef.current ? encodeYDocState(ydocRef.current) : undefined,
+      });
       toast({ title: 'Code saved successfully' });
     } catch {
       toast({ title: 'Failed to save code', variant: 'destructive' });
@@ -825,19 +931,8 @@ export default function Room() {
             <Editor
               height="100%"
               language={language}
-              value={code}
+              defaultValue={code}
               onMount={handleEditorDidMount}
-              onChange={(value) => {
-                if (isEditorReadOnly) return;
-                if (value !== undefined && !isRemoteUpdate.current) {
-                  updateCode(value);
-                  if (user?.id && user?.name) {
-                    markUserTyping(user.id, user.name);
-                  }
-                  queueCodeEmit(value);
-                  emitTypingActivity();
-                }
-              }}
               theme={isDarkMode ? 'vs-dark' : 'light'}
               options={{ readOnly: isEditorReadOnly, fontSize: 14, fontFamily: 'JetBrains Mono, monospace', fontLigatures: true, minimap: { enabled: false }, padding: { top: 18, bottom: 18 }, scrollBeyondLastLine: false, automaticLayout: true, tabSize: 2, wordWrap: 'on', lineNumbersMinChars: 3, renderLineHighlight: 'gutter', cursorBlinking: 'smooth', smoothScrolling: true }}
             />
