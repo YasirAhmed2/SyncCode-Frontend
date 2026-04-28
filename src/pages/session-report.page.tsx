@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/auth.context';
 import { ChevronLeft, Users, Clock, Zap, Award, TrendingUp, BarChart2, AlertCircle, Loader2, User } from 'lucide-react';
-import sessionService, { ReportResponse, UserStat } from '../lib/sessionService';
+import sessionService, { type PracticeSubmission, type ReportResponse, type UserStat } from '../lib/sessionService';
 
 function formatDuration(ms: number): string {
   if (!ms || ms <= 0) return '0m 0s';
@@ -78,6 +78,7 @@ export default function SessionReportPage() {
   }
 
   const { analytics, sessionDurationMs, startedAt, roomName, isTeacher } = report!;
+  const submissions = report?.practiceSubmissions || [];
 
   return (
     <div className="min-h-screen bg-background text-foreground font-sans">
@@ -307,6 +308,46 @@ export default function SessionReportPage() {
             </motion.section>
           )}
         </div>
+
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.35, duration: 0.35 }}
+          className="bg-card/70 border border-border rounded-2xl overflow-hidden mt-5"
+        >
+          <div className="px-[22px] py-[18px] border-b border-border/60 flex items-center gap-2.5">
+            <User size={16} className="text-primary" />
+            <span className="text-[14px] font-bold text-foreground">
+              {isTeacher ? 'Practice Submissions' : 'Your Practice Submission'}
+            </span>
+            <span className="ml-auto text-[11px] font-semibold text-primary/80 bg-primary/10 px-2 py-0.5 rounded-full">
+              {submissions.length}
+            </span>
+          </div>
+
+          <div className="p-4 space-y-3">
+            {submissions.length === 0 ? (
+              <div className="text-[13px] text-muted-foreground">No practice submissions recorded yet.</div>
+            ) : (
+              submissions.map((submission: PracticeSubmission) => (
+                <div
+                  key={submission.studentId}
+                  className="border border-border/60 rounded-xl bg-muted/25 overflow-hidden"
+                >
+                  <div className="px-4 py-3 border-b border-border/50 flex items-center justify-between gap-3">
+                    <div className="text-[13px] font-semibold text-foreground">{submission.studentName}</div>
+                    <div className="text-[11px] text-muted-foreground">
+                      {submission.language.toUpperCase()} • {new Date(submission.updatedAt).toLocaleString()}
+                    </div>
+                  </div>
+                  <pre className="m-0 p-4 text-[12px] leading-5 font-mono text-foreground whitespace-pre-wrap break-words bg-background/60">
+                    {submission.code || '// No code submitted'}
+                  </pre>
+                </div>
+              ))
+            )}
+          </div>
+        </motion.section>
       </main>
 
       <style>{`

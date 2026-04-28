@@ -16,6 +16,14 @@ export interface ReportAnalytics {
   userStats: UserStat[];
 }
 
+export interface PracticeSubmission {
+  studentId: string;
+  studentName: string;
+  code: string;
+  language: 'javascript' | 'python';
+  updatedAt: string;
+}
+
 export interface ReportResponse {
   roomId: string;
   roomName: string;
@@ -24,6 +32,7 @@ export interface ReportResponse {
   sessionDurationMs: number;
   isTeacher: boolean;
   analytics: ReportAnalytics;
+  practiceSubmissions?: PracticeSubmission[];
 }
 
 const sessionService = {

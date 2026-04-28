@@ -75,9 +75,16 @@ export default function Room() {
   const typingStopTimerRef = useRef<number | null>(null);
   const typingResetTimersRef = useRef<Record<string, number>>({});
   const awarenessTypingTimerRef = useRef<number | null>(null);
+  const editorSecurityDisposablesRef = useRef<Array<{ dispose: () => void }>>([]);
+  const roomModeRef = useRef<'broadcast' | 'practice'>(roomMode);
+  const isTeacherRef = useRef<boolean>(false);
+  const blockedClipboardToastTsRef = useRef<number>(0);
+  const personalSubmissionCodeRef = useRef<string>('');
+  const languageRef = useRef<'javascript' | 'python'>(language);
 
   const isTeacher = Boolean(user?.id && teacherId && user.id === teacherId);
-  const isStudentReadOnly = !isTeacher && (isEditorLocked || roomMode === 'broadcast');
+  const isPracticeEnabled = roomMode === 'practice';
+  const isStudentReadOnly = !isTeacher && roomMode === 'broadcast';
   const isEditorReadOnly = isStudentReadOnly;
 
   const normalizeMessage = (raw: any): Message => ({
@@ -91,7 +98,7 @@ export default function Room() {
   const emitUserActivity = () => {
     if (!roomId || !user?.id) return;
     // Suppress activity emission for teachers and when practice is disabled
-    if (isTeacher || isEditorLocked) return;
+    if (isTeacher || roomMode !== 'practice') return;
     socket.emit('user-activity', { roomId, userId: user.id, source: "local" });
   };
 
@@ -99,7 +106,7 @@ export default function Room() {
     if (!roomId || !user?.id) return;
 
     // Skip activity for teachers or when practice is disabled
-    if (isTeacher || isEditorLocked) return;
+    if (isTeacher || roomMode !== 'practice') return;
     socket.emit('user-typing', { roomId, userId: user.id, source: "local" });
     socket.emit('user-activity', { roomId, userId: user.id, source: "local" });
     if (typingStopTimerRef.current !== null) {
@@ -121,6 +128,32 @@ export default function Room() {
 
     const minutes = Math.floor(seconds / 60);
     return `${minutes}m ago`;
+  };
+
+  const applyDeltaToPersonalCode = (current: string, delta: Array<any>) => {
+    let next = current;
+    let cursor = 0;
+
+    for (const op of delta) {
+      if (typeof op?.retain === 'number') {
+        cursor = Math.max(0, Math.min(next.length, cursor + op.retain));
+        continue;
+      }
+
+      if (typeof op?.insert === 'string' && op.insert.length > 0) {
+        const pos = Math.max(0, Math.min(next.length, cursor));
+        next = `${next.slice(0, pos)}${op.insert}${next.slice(pos)}`;
+        cursor = pos + op.insert.length;
+        continue;
+      }
+
+      if (typeof op?.delete === 'number' && op.delete > 0) {
+        const pos = Math.max(0, Math.min(next.length, cursor));
+        next = `${next.slice(0, pos)}${next.slice(pos + op.delete)}`;
+      }
+    }
+
+    return next;
   };
 
   const syncPresenceFromAwareness = () => {
@@ -212,6 +245,61 @@ export default function Room() {
     monacoRef.current = monaco;
     bindMonacoToYjs();
 
+    editorSecurityDisposablesRef.current.forEach((disposable) => disposable.dispose());
+    editorSecurityDisposablesRef.current = [];
+
+    const shouldBlockClipboard = () => !isTeacherRef.current && roomModeRef.current === 'practice';
+    const showClipboardBlockedToast = () => {
+      const now = Date.now();
+      if (now - blockedClipboardToastTsRef.current < 1500) return;
+      blockedClipboardToastTsRef.current = now;
+      toast({
+        title: 'Copy and paste are disabled in practice mode',
+        description: 'Practice mode only allows original typing for students.',
+        variant: 'destructive',
+      });
+    };
+
+    const keyDisposable = editor.onKeyDown((e: any) => {
+      if (!shouldBlockClipboard()) return;
+
+      const isMeta = e.ctrlKey || e.metaKey;
+      const isBlockedShortcut = isMeta && (
+        e.keyCode === monaco.KeyCode.KeyC ||
+        e.keyCode === monaco.KeyCode.KeyV ||
+        e.keyCode === monaco.KeyCode.KeyX ||
+        (e.keyCode === monaco.KeyCode.Insert && e.shiftKey)
+      );
+
+      if (!isBlockedShortcut) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+      showClipboardBlockedToast();
+    });
+    editorSecurityDisposablesRef.current.push(keyDisposable);
+
+    const domNode = editor.getDomNode();
+    if (domNode) {
+      const preventClipboardEvent = (event: ClipboardEvent) => {
+        if (!shouldBlockClipboard()) return;
+        event.preventDefault();
+        showClipboardBlockedToast();
+      };
+
+      domNode.addEventListener('copy', preventClipboardEvent);
+      domNode.addEventListener('cut', preventClipboardEvent);
+      domNode.addEventListener('paste', preventClipboardEvent);
+
+      editorSecurityDisposablesRef.current.push({
+        dispose: () => {
+          domNode.removeEventListener('copy', preventClipboardEvent);
+          domNode.removeEventListener('cut', preventClipboardEvent);
+          domNode.removeEventListener('paste', preventClipboardEvent);
+        },
+      });
+    }
+
     editor.onDidChangeCursorPosition((e: any) => {
       if (!roomId || !user?.id || !user?.name) return;
 
@@ -252,6 +340,27 @@ export default function Room() {
         setLocalTypingPresence();
       };
 
+      const handleYTextObserve = (event: any, transaction: any) => {
+        if (transaction?.origin === REMOTE_SYNC_ORIGIN || transaction?.origin === INITIAL_SYNC_ORIGIN) {
+          return;
+        }
+
+        if (!roomId || !user?.id) return;
+        if (isTeacherRef.current || roomModeRef.current !== 'practice') return;
+
+        const delta = Array.isArray(event?.delta) ? event.delta : [];
+        if (!delta.length) return;
+
+        const updatedPersonalCode = applyDeltaToPersonalCode(personalSubmissionCodeRef.current, delta);
+        personalSubmissionCodeRef.current = updatedPersonalCode;
+
+        socket.emit('practice-submission-update', {
+          roomId,
+          code: updatedPersonalCode,
+          language: languageRef.current,
+        });
+      };
+
       const handleAwarenessUpdate = (
         { added, updated, removed }: { added: number[]; updated: number[]; removed: number[] },
         origin: unknown
@@ -273,6 +382,7 @@ export default function Room() {
       };
 
       ydoc.on('update', handleDocUpdate);
+      yText.observe(handleYTextObserve);
       awareness.on('update', handleAwarenessUpdate);
 
       socket.auth = { token: localStorage.getItem('token') };
@@ -292,6 +402,13 @@ export default function Room() {
         }
 
         bindMonacoToYjs();
+
+        // Seed student's personal practice buffer from current doc so delta application
+        // doesn't scramble text when the shared doc already contains starter code.
+        // (We still ignore remote edits later; this buffer only tracks the student's local changes.)
+        if (!isTeacherRef.current && roomModeRef.current === 'practice') {
+          personalSubmissionCodeRef.current = yText.toString();
+        }
       });
       socket.on('yjs-update', (incomingUpdate: any) => {
         const normalized = normalizeBinaryUpdate(incomingUpdate);
@@ -366,12 +483,15 @@ export default function Room() {
       socket.on('room-mode-updated', (data: any) => {
         if (data?.mode === 'broadcast' || data?.mode === 'practice') {
           setRoomMode(data.mode);
+          toast({
+            title: data.mode === 'practice' ? 'Practice enabled for students' : 'Practice disabled by teacher',
+            duration: 2000,
+          });
         }
       });
       socket.on('room-lock-updated', (data: any) => {
         if (typeof data?.isLocked === 'boolean') {
           setIsEditorLocked(data.isLocked);
-          toast({ title: data.isLocked ? 'Practice disabled by teacher' : 'Practice enabled for students', duration: 2000 });
         }
       });
       socket.on('room-chat-history', ({ messages: roomMessages }: any) => {
@@ -427,14 +547,44 @@ export default function Room() {
         });
         typingResetTimersRef.current = {};
         ydoc.off('update', handleDocUpdate);
+        yText.unobserve(handleYTextObserve);
         awareness.off('update', handleAwarenessUpdate);
         socket.emit('leave-room', { roomId, userId: user.id });
         destroyYjsBinding();
+        editorSecurityDisposablesRef.current.forEach((disposable) => disposable.dispose());
+        editorSecurityDisposablesRef.current = [];
         socket.disconnect();
         setIsConnected(false);
       };
     }
   }, [roomId, user]);
+
+  useEffect(() => {
+    // If teacher enables practice while the student is already in the room,
+    // initialize the personal submission buffer at that moment to keep
+    // subsequent deltas aligned with the current document text.
+    if (isTeacher) return;
+    if (roomMode !== 'practice') return;
+    if (personalSubmissionCodeRef.current) return;
+    const currentText = yTextRef.current?.toString() ?? '';
+    personalSubmissionCodeRef.current = currentText;
+  }, [roomMode, isTeacher]);
+
+  useEffect(() => {
+    roomModeRef.current = roomMode;
+  }, [roomMode]);
+
+  useEffect(() => {
+    languageRef.current = language;
+  }, [language]);
+
+  useEffect(() => {
+    isTeacherRef.current = isTeacher;
+  }, [isTeacher]);
+
+  useEffect(() => {
+    personalSubmissionCodeRef.current = '';
+  }, [roomId, user?.id]);
 
   useEffect(() => {
     if (!currentRoom) return;
@@ -630,7 +780,8 @@ export default function Room() {
   const handleLeave = () => { leaveRoom(); navigate('/dashboard'); };
   const handleToggleLock = () => {
     if (!roomId || !isTeacher) return;
-    socket.emit('lock-editor', { roomId, isLocked: !isEditorLocked });
+    const nextMode = roomMode === 'practice' ? 'broadcast' : 'practice';
+    socket.emit('toggle-mode', { roomId, mode: nextMode });
   };
   const handleRemoveParticipant = () => {
     if (!roomId || !isTeacher || !selectedParticipantId) return;
@@ -709,7 +860,7 @@ export default function Room() {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span className="px-2 py-[3px] rounded-full text-[11px] font-semibold border" style={{ borderColor: isEditorLocked ? 'rgba(239,68,68,0.25)' : 'hsl(var(--border))', background: isEditorLocked ? 'rgba(239,68,68,0.12)' : 'hsl(var(--muted) / 0.5)', color: isEditorLocked ? '#EF4444' : 'hsl(var(--muted-foreground))' }}>
-              {isEditorLocked ? 'Practice Disabled' : 'Practice Enabled'}
+              {isPracticeEnabled ? 'Practice Enabled' : 'Practice Disabled'}
             </span>
           </div>
         </div>
@@ -749,8 +900,8 @@ export default function Room() {
                 onClick={handleToggleLock}
                 className="h-8 px-3 rounded-lg text-[12px] font-semibold flex items-center gap-1.5 bg-muted/50 text-foreground border border-border cursor-pointer transition-all duration-150 hover:bg-muted hover:border-border"
               >
-                {isEditorLocked ? <Unlock size={13} /> : <Lock size={13} />}
-                {isEditorLocked ? 'Enable Practice' : 'Disable Practice'}
+                {isPracticeEnabled ? <Lock size={13} /> : <Unlock size={13} />}
+                {isPracticeEnabled ? 'Disable Practice' : 'Enable Practice'}
               </button>
               <select
                 value={selectedParticipantId}
