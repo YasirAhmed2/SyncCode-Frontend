@@ -79,6 +79,7 @@ export default function Room() {
   const roomModeRef = useRef<'broadcast' | 'practice'>(roomMode);
   const isTeacherRef = useRef<boolean>(false);
   const blockedClipboardToastTsRef = useRef<number>(0);
+  /** Student-local mirror of shared doc for practice submissions (remote Yjs updates ignored). */
   const personalSubmissionCodeRef = useRef<string>('');
   const languageRef = useRef<'javascript' | 'python'>(language);
 
@@ -97,16 +98,15 @@ export default function Room() {
 
   const emitUserActivity = () => {
     if (!roomId || !user?.id) return;
-    // Suppress activity emission for teachers and when practice is disabled
-    if (isTeacher || roomMode !== 'practice') return;
+    // Use refs so activity still emits after mode switches (handlers/effect may close over stale state).
+    if (isTeacherRef.current || roomModeRef.current !== 'practice') return;
     socket.emit('user-activity', { roomId, userId: user.id, source: "local" });
   };
 
   const emitTypingActivity = () => {
     if (!roomId || !user?.id) return;
 
-    // Skip activity for teachers or when practice is disabled
-    if (isTeacher || roomMode !== 'practice') return;
+    if (isTeacherRef.current || roomModeRef.current !== 'practice') return;
     socket.emit('user-typing', { roomId, userId: user.id, source: "local" });
     socket.emit('user-activity', { roomId, userId: user.id, source: "local" });
     if (typingStopTimerRef.current !== null) {
@@ -403,9 +403,7 @@ export default function Room() {
 
         bindMonacoToYjs();
 
-        // Seed student's personal practice buffer from current doc so delta application
-        // doesn't scramble text when the shared doc already contains starter code.
-        // (We still ignore remote edits later; this buffer only tracks the student's local changes.)
+        // Seed from current doc so local deltas stay aligned with Yjs positions (session report text matches editor).
         if (!isTeacherRef.current && roomModeRef.current === 'practice') {
           personalSubmissionCodeRef.current = yText.toString();
         }
@@ -560,9 +558,7 @@ export default function Room() {
   }, [roomId, user]);
 
   useEffect(() => {
-    // If teacher enables practice while the student is already in the room,
-    // initialize the personal submission buffer at that moment to keep
-    // subsequent deltas aligned with the current document text.
+    // When teacher enables practice mid-session, align submission buffer with current doc once.
     if (isTeacher) return;
     if (roomMode !== 'practice') return;
     if (personalSubmissionCodeRef.current) return;
