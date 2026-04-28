@@ -130,32 +130,6 @@ export default function Room() {
     return `${minutes}m ago`;
   };
 
-  const applyDeltaToPersonalCode = (current: string, delta: Array<any>) => {
-    let next = current;
-    let cursor = 0;
-
-    for (const op of delta) {
-      if (typeof op?.retain === 'number') {
-        cursor = Math.max(0, Math.min(next.length, cursor + op.retain));
-        continue;
-      }
-
-      if (typeof op?.insert === 'string' && op.insert.length > 0) {
-        const pos = Math.max(0, Math.min(next.length, cursor));
-        next = `${next.slice(0, pos)}${op.insert}${next.slice(pos)}`;
-        cursor = pos + op.insert.length;
-        continue;
-      }
-
-      if (typeof op?.delete === 'number' && op.delete > 0) {
-        const pos = Math.max(0, Math.min(next.length, cursor));
-        next = `${next.slice(0, pos)}${next.slice(pos + op.delete)}`;
-      }
-    }
-
-    return next;
-  };
-
   const syncPresenceFromAwareness = () => {
     const awareness = awarenessRef.current;
     if (!awareness) return;
@@ -351,12 +325,16 @@ export default function Room() {
         const delta = Array.isArray(event?.delta) ? event.delta : [];
         if (!delta.length) return;
 
-        const updatedPersonalCode = applyDeltaToPersonalCode(personalSubmissionCodeRef.current, delta);
-        personalSubmissionCodeRef.current = updatedPersonalCode;
+        // Use live Y.Text after this transaction — do not merge deltas into a stale string
+        // (after remote peers edit, shadow != doc and applyDelta corrupts the second+ student).
+        const yt = yTextRef.current;
+        if (!yt) return;
+        const liveCode = yt.toString();
+        personalSubmissionCodeRef.current = liveCode;
 
         socket.emit('practice-submission-update', {
           roomId,
-          code: updatedPersonalCode,
+          code: liveCode,
           language: languageRef.current,
         });
       };
