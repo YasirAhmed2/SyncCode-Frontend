@@ -5,57 +5,58 @@
 @tailwind utilities;
 
 @layer base {
+
   /* ── Dark theme (default) ── */
   :root {
     color-scheme: dark;
-    --background: 222 47% 7%;
-    --foreground: 220 14% 96%;
-    --card: 222 47% 11%;
-    --card-foreground: 220 14% 96%;
-    --popover: 222 47% 11%;
-    --popover-foreground: 220 14% 96%;
-    --primary: 239 84% 67%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 222 30% 15%;
-    --secondary-foreground: 220 14% 80%;
-    --muted: 222 24% 16%;
-    --muted-foreground: 220 10% 62%;
-    --accent: 221 83% 53%;
-    --accent-foreground: 0 0% 100%;
+    --background: 0 0% 5%;
+    --foreground: 0 0% 95%;
+    --card: 0 0% 8%;
+    --card-foreground: 0 0% 95%;
+    --popover: 0 0% 8%;
+    --popover-foreground: 0 0% 95%;
+    --primary: 48 96% 53%;
+    --primary-foreground: 0 0% 9%;
+    --secondary: 0 0% 12%;
+    --secondary-foreground: 0 0% 90%;
+    --muted: 0 0% 12%;
+    --muted-foreground: 0 0% 60%;
+    --accent: 48 96% 53%;
+    --accent-foreground: 0 0% 9%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
     --success: 160 84% 39%;
     --success-foreground: 0 0% 100%;
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 0%;
-    --border: 222 27% 20%;
-    --input: 222 27% 16%;
-    --ring: 239 84% 67%;
+    --border: 0 0% 15%;
+    --input: 0 0% 12%;
+    --ring: 48 96% 53%;
     --radius: 0.9rem;
-    --shadow-card: 0 10px 30px rgba(2, 6, 23, 0.28);
-    --shadow-card-hover: 0 20px 40px rgba(2, 6, 23, 0.35);
-    --shadow-primary: 0 14px 32px rgba(79, 70, 229, 0.28);
+    --shadow-card: 0 10px 30px rgba(0, 0, 0, 0.5);
+    --shadow-card-hover: 0 20px 40px rgba(0, 0, 0, 0.6);
+    --shadow-primary: 0 14px 32px rgba(250, 204, 21, 0.28);
     --surface-glow:
-      radial-gradient(ellipse 80% 40% at 50% -5%, rgba(99, 102, 241, 0.08), transparent),
-      radial-gradient(ellipse 50% 30% at 85% 85%, rgba(37, 99, 235, 0.06), transparent);
+      radial-gradient(ellipse 80% 40% at 50% -5%, rgba(250, 204, 21, 0.08), transparent),
+      radial-gradient(ellipse 50% 30% at 85% 85%, rgba(234, 179, 8, 0.06), transparent);
   }
 
   /* ── Light theme ── */
   .light {
     color-scheme: light;
-    --background: 220 20% 98%;
-    --foreground: 224 28% 14%;
-    --card: 0 0% 100%;
-    --card-foreground: 224 28% 14%;
+    --background: 45 25% 97%; /* Cream/off-white */
+    --foreground: 0 0% 15%; /* Dark gray text */
+    --card: 0 0% 100%; /* Pure white for cards/nav */
+    --card-foreground: 0 0% 15%;
     --popover: 0 0% 100%;
-    --popover-foreground: 224 28% 14%;
-    --primary: 239 84% 62%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 220 20% 94%;
-    --secondary-foreground: 224 20% 22%;
-    --muted: 220 16% 93%;
-    --muted-foreground: 220 10% 42%;
-    --accent: 221 78% 52%;
+    --popover-foreground: 0 0% 15%;
+    --primary: 42 75% 42%; /* Executive dark gold/mustard */
+    --primary-foreground: 0 0% 100%; /* White text on buttons */
+    --secondary: 40 20% 90%;
+    --secondary-foreground: 0 0% 22%;
+    --muted: 40 15% 92%;
+    --muted-foreground: 40 10% 45%;
+    --accent: 42 75% 42%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
@@ -63,15 +64,13 @@
     --success-foreground: 0 0% 100%;
     --warning: 38 92% 45%;
     --warning-foreground: 0 0% 100%;
-    --border: 220 14% 86%;
-    --input: 220 14% 90%;
-    --ring: 239 84% 62%;
-    --shadow-card: 0 4px 20px rgba(15, 23, 42, 0.06);
-    --shadow-card-hover: 0 12px 32px rgba(15, 23, 42, 0.10);
-    --shadow-primary: 0 10px 28px rgba(79, 70, 229, 0.14);
-    --surface-glow:
-      radial-gradient(ellipse 80% 40% at 50% -5%, rgba(99, 102, 241, 0.05), transparent),
-      radial-gradient(ellipse 55% 30% at 100% 85%, rgba(37, 99, 235, 0.03), transparent);
+    --border: 40 15% 85%; /* Slightly warmer border */
+    --input: 40 15% 90%;
+    --ring: 42 75% 42%;
+    --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.04);
+    --shadow-card-hover: 0 12px 32px rgba(0, 0, 0, 0.08);
+    --shadow-primary: 0 10px 28px rgba(184, 134, 11, 0.25); /* Shadow matching new gold */
+    --surface-glow: none; /* Removed glow for a flatter, executive look in light mode */
   }
 
   .dark {
@@ -107,7 +106,7 @@
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(99, 102, 241, 0.28) transparent;
+  scrollbar-color: rgba(250, 204, 21, 0.28) transparent;
 }
 
 *::-webkit-scrollbar {
@@ -120,33 +119,34 @@
 }
 
 *::-webkit-scrollbar-thumb {
-  background: rgba(99, 102, 241, 0.25);
+  background: rgba(250, 204, 21, 0.25);
   border-radius: 999px;
 }
 
 *::-webkit-scrollbar-thumb:hover {
-  background: rgba(99, 102, 241, 0.45);
+  background: rgba(250, 204, 21, 0.45);
 }
 
 @layer utilities {
   .text-gradient {
     @apply bg-clip-text text-transparent;
-    background-image: linear-gradient(135deg, #818cf8 0%, #4f46e5 100%);
+    background-image: linear-gradient(135deg, #fef08a 0%, #eab308 100%);
   }
 
   .glass-card {
     background: hsl(var(--card) / 0.78);
-    border: 1px solid hsl(var(--border) / 0.9);
-    box-shadow: var(--shadow-card);
+    border: 1px solid hsl(var(--primary) / 0.4);
+    box-shadow: 0 0 15px hsl(var(--primary) / 0.25), inset 0 0 10px hsl(var(--primary) / 0.1);
     backdrop-filter: blur(16px);
   }
 
   .glass-card-hover {
-    @apply transition-all duration-200;
+    @apply transition-all duration-300;
   }
 
   .glass-card-hover:hover {
-    box-shadow: var(--shadow-card-hover);
+    border-color: hsl(var(--primary) / 0.8);
+    box-shadow: 0 0 25px hsl(var(--primary) / 0.45), inset 0 0 15px hsl(var(--primary) / 0.2);
     transform: translateY(-2px);
   }
 
@@ -195,12 +195,10 @@
 
   .skeleton {
     @apply rounded-lg;
-    background: linear-gradient(
-      90deg,
-      hsl(var(--muted)) 20%,
-      hsl(var(--border)) 50%,
-      hsl(var(--muted)) 80%
-    );
+    background: linear-gradient(90deg,
+        hsl(var(--muted)) 20%,
+        hsl(var(--border)) 50%,
+        hsl(var(--muted)) 80%);
     background-size: 200% 100%;
     animation: shimmer 1.6s linear infinite;
   }
@@ -230,7 +228,7 @@
     position: absolute;
     inset: -1px;
     border-radius: 0.75rem;
-    background: rgba(99, 102, 241, 0.15);
+    background: rgba(250, 204, 21, 0.15);
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.2s ease;
@@ -252,16 +250,19 @@
   0% {
     background-position: -200% 0;
   }
+
   100% {
     background-position: 200% 0;
   }
 }
 
 @keyframes cursor-blink {
+
   0%,
   100% {
     opacity: 1;
   }
+
   50% {
     opacity: 0;
   }

@@ -15,9 +15,9 @@ export default {
         "card-foreground": "hsl(var(--card-foreground))",
 
         // Enterprise Brand Colors
-        "brand-indigo":  "#4F46E5",
-        "brand-blue":    "#2563EB",
-        "brand-slate":   "#818CF8",
+        "brand-indigo":  "#eab308",
+        "brand-blue":    "#ca8a04",
+        "brand-slate":   "#fef08a",
         "surface-dark":  "#0B0F19",
         "surface-card":  "#111827",
         "surface-panel": "#0D1117",
@@ -69,7 +69,7 @@ export default {
         "gradient-primary":  "var(--gradient-primary)",
         "gradient-accent":   "var(--gradient-accent)",
         "gradient-surface":  "var(--gradient-surface)",
-        "gradient-brand":    "linear-gradient(135deg, #4F46E5 0%, #6366F1 100%)",
+        "gradient-brand":    "linear-gradient(135deg, #eab308 0%, #facc15 100%)",
         "gradient-card":     "linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01))",
         "shimmer":           "linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent)",
       },
@@ -79,8 +79,8 @@ export default {
           "50%": { transform: "translateY(-20px)" },
         },
         "pulse-glow": {
-          "0%, 100%": { boxShadow: "0 0 20px rgba(108, 99, 255, 0.3)" },
-          "50%": { boxShadow: "0 0 50px rgba(108, 99, 255, 0.6)" },
+          "0%, 100%": { boxShadow: "0 0 20px rgba(250, 204, 21, 0.3)" },
+          "50%": { boxShadow: "0 0 50px rgba(250, 204, 21, 0.6)" },
         },
         shimmer: {
           "0%": { backgroundPosition: "-200% 0" },
