@@ -1,6 +1,6 @@
 import { io } from 'socket.io-client';
 
-const DEFAULT_SOCKET_URL = 'https://api.synccode.dev:8080';
+const DEFAULT_SOCKET_URL = 'https://api.synccode.dev';
 
 const normalizeBaseUrl = (rawUrl: string) => {
   const withProtocol = /^https?:\/\//i.test(rawUrl) ? rawUrl : `http://${rawUrl}`;
