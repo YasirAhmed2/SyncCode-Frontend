@@ -11,7 +11,7 @@ const normalizeBaseUrl = (rawUrl: string) => {
 
 // Determine API base URL from env first, then fallback to the configured backend IP.
 const getAPIBaseURL = () => {
-  const configuredUrl = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL;
+  const configuredUrl = import.meta.env.VITE_API_BASE_URL || import.meta.env.API_URL;
   if (configuredUrl) {
     return normalizeBaseUrl(configuredUrl);
   }
