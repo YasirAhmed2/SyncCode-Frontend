@@ -2,7 +2,7 @@
 
 import axios from "axios";
 
-const DEFAULT_BACKEND_URL = "http://localhost:8080";
+const DEFAULT_BACKEND_URL = "https://api.synccode.dev:8080";
 
 const normalizeBaseUrl = (rawUrl: string) => {
   const withProtocol = /^https?:\/\//i.test(rawUrl) ? rawUrl : `http://${rawUrl}`;
